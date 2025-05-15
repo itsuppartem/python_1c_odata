@@ -19,10 +19,10 @@ pip install python-1c-odata
 
 ```python
 import asyncio
-from odata.core import Infobase
-from odata.document import Document
-from odata.catalog import Catalog
-from odata.informationregister import InformationRegister
+from python_1c_odata.core import Infobase
+from python_1c_odata.document import Document
+from python_1c_odata.catalog import Catalog
+from python_1c_odata.informationregister import InformationRegister
 
 async def main():
     # Connect to 1C
