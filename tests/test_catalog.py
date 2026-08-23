@@ -33,6 +33,14 @@ async def test_query_hits_catalog_collection_with_odata_options(fake_odata, info
     assert qs["$orderby"] == ["Description"]
 
 
+async def test_query_sends_allowed_only_and_inlinecount(fake_odata, infobase):
+    fake_odata.respond(200, {"value": [], "__count": "0"})
+    await Catalog(infobase, "Товары").query(allowed_only=True, inlinecount=True)
+    qs = parse_qs(fake_odata.last["query"], keep_blank_values=True)
+    assert qs["allowedOnly"] == ["true"]
+    assert qs["$inlinecount"] == ["allpages"]
+
+
 async def test_get_uses_guid_key(fake_odata, infobase):
     fake_odata.respond(200, {"Description": "Сапоги"})
     item = await Catalog(infobase, "Товары").get("41aa6331-954f-11e3-814b-005056c00008")

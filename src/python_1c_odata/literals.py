@@ -10,6 +10,10 @@ def parse_guid(value: str) -> str:
     return str(UUID(str(value)))
 
 
+def guid(value: str) -> str:
+    return f"guid'{parse_guid(value)}'"
+
+
 def odata_datetime(value: datetime | date | str) -> str:
     if isinstance(value, str):
         stripped = value.strip()

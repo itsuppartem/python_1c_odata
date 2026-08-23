@@ -14,6 +14,21 @@ async def test_create_rejects_posted_flag_before_http(fake_odata, infobase):
     assert fake_odata.requests == []
 
 
+async def test_create_rejects_russian_posted_flag(fake_odata, infobase):
+    with pytest.raises(ValueError, match="Posted"):
+        await Document(infobase, "Заказ").create(
+            {"Date": "2024-01-01T00:00:00", "Проведен": True}
+        )
+    assert fake_odata.requests == []
+
+
+async def test_create_accepts_russian_date_field(fake_odata, infobase):
+    fake_odata.respond(201, {"Ref_Key": "41aa6331-954f-11e3-814b-005056c00008"})
+    created = await Document(infobase, "Заказ").create({"Дата": "2024-01-01T00:00:00"})
+    assert created["Ref_Key"].startswith("41aa")
+    assert fake_odata.last["path"].endswith("Document_Заказ")
+
+
 async def test_create_requires_date(fake_odata, infobase):
     with pytest.raises(ValueError, match="Date"):
         await Document(infobase, "Заказ").create({"Number": "0001"})

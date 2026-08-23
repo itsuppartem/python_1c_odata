@@ -6,6 +6,10 @@ from python_1c_odata.entity import EntitySet
 from python_1c_odata.posting import PostingMode
 
 
+_DATE_FIELDS = ("Date", "Дата")
+_POSTED_FIELDS = ("Posted", "Проведен")
+
+
 class Document(EntitySet):
     kind = "Document"
 
@@ -17,7 +21,7 @@ class Document(EntitySet):
         timeout: float | None = None,
     ) -> Any:
         _reject_posted(data)
-        if "Date" not in data:
+        if not any(field in data for field in _DATE_FIELDS):
             raise ValueError("Date cannot be empty")
         created = await super().create(data, timeout=timeout)
         if posting_mode != PostingMode.UNPOST:
@@ -56,5 +60,5 @@ class Document(EntitySet):
 
 
 def _reject_posted(data: dict[str, Any]) -> None:
-    if "Posted" in data:
+    if any(field in data for field in _POSTED_FIELDS):
         raise ValueError('Do not pass the "Posted" field')

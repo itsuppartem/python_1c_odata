@@ -118,3 +118,24 @@ def test_accumulation_balance_and_turnovers_use_named_period_params():
 def test_query_string_rejects_non_int_top():
     with pytest.raises(TypeError):
         query_string(top="10")
+
+
+def test_query_string_adds_1c_allowed_only_and_inlinecount():
+    qs = query_string(allowed_only=True, inlinecount=True)
+    assert "allowedOnly=true" in qs
+    assert "$inlinecount=allpages" in qs
+
+
+def test_composite_key_wraps_bare_uuid_and_quotes_plain_string():
+    url = key_path(
+        "http://h/ib/odata/standard.odata",
+        "InformationRegister_Цены_RecordType",
+        {
+            "Товар_Key": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "ТипЦены": "Розничная",
+        },
+    )
+    assert url.endswith(
+        "InformationRegister_Цены_RecordType("
+        "Товар_Key=guid'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',ТипЦены='Розничная')"
+    )

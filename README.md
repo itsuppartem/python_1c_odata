@@ -65,9 +65,13 @@ asyncio.run(main())
 | Регистр сведений | `query` + `slice_last` / `slice_first` (`Period`, `Condition`) |
 | Регистр накопления | `query` + `balance` / `turnovers` / `balance_and_turnovers` |
 
-Общие параметры выборки: `top`, `skip`, `select`, `odata_filter`, `expand`, `orderby`.
+Общие параметры выборки: `top`, `skip`, `select`, `odata_filter`, `expand`, `orderby`, `allowed_only` (1С RLS: `allowedOnly=true`), `inlinecount`.
 
 Ошибки HTTP 4xx/5xx — `ODataError` со статусом и текстом 1С, не «голый» `Exception`.
+
+`$metadata` (XML схемы базы): `await ib.metadata()`.
+GUID в фильтре: `from python_1c_odata import guid` → `guid("41aa-...")` даёт `guid'41aa-...'`.
+Документ принимает и `Date`/`Posted`, и привычные `Дата`/`Проведен`.
 
 ## Чего нет (пока)
 

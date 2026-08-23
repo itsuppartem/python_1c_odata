@@ -82,7 +82,14 @@ class Infobase:
             if action:
                 path = f"{path}/{action}"
         extra = query.pop("extra", None)
-        return path + query_string(extra=extra, **query)
+        allowed_only = query.pop("allowed_only", False)
+        inlinecount = query.pop("inlinecount", False)
+        return path + query_string(
+            extra=extra,
+            allowed_only=bool(allowed_only),
+            inlinecount=bool(inlinecount),
+            **query,
+        )
 
     async def get(self, entity: str, *, key: str | Mapping[str, str] | None = None, **query: Any) -> Any:
         timeout = query.pop("timeout", None)
@@ -163,6 +170,21 @@ class Infobase:
                 return json.loads(text)
             except ValueError as exc:
                 raise ODataError(response.status, f"invalid JSON: {text[:200]}", body=text) from exc
+
+    async def metadata(self, *, timeout: float | None = None) -> str:
+        await self._ensure_session()
+        url = f"{self.root}/$metadata"
+        kwargs: dict[str, Any] = {"headers": {**self._headers, "Accept": "application/xml"}}
+        if self._ssl is not True:
+            kwargs["ssl"] = self._ssl
+        if timeout is not None:
+            kwargs["timeout"] = aiohttp.ClientTimeout(total=timeout)
+        assert self._session is not None
+        async with self._session.request("GET", url, **kwargs) as response:
+            text = await response.text()
+            if response.status != 200:
+                raise error_from_response(response.status, text)
+            return text
 
     async def _ensure_session(self) -> None:
         if self._session is None or self._session.closed:

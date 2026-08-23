@@ -5,6 +5,8 @@ from __future__ import annotations
 from urllib.parse import quote
 from typing import Mapping
 
+from python_1c_odata.literals import guid
+
 _ODATA_QUERY_SAFE = "$,'()/:;_!=*"
 
 
@@ -19,9 +21,9 @@ def entity_path(root: str, entity: str) -> str:
 def key_path(root: str, entity: str, key: str | Mapping[str, str]) -> str:
     base = entity_path(root, entity)
     if isinstance(key, Mapping):
-        inner = ",".join(f"{name}={value}" for name, value in key.items())
+        inner = ",".join(f"{name}={_key_literal(value)}" for name, value in key.items())
         return f"{base}({inner})"
-    return f"{base}(guid'{key}')"
+    return f"{base}({guid(key)})"
 
 
 def query_string(
@@ -33,6 +35,8 @@ def query_string(
     expand: str | None = None,
     orderby: str | None = None,
     extra: Mapping[str, str] | None = None,
+    allowed_only: bool = False,
+    inlinecount: bool = False,
 ) -> str:
     if top is not None and type(top) is not int:
         raise TypeError(f"top={top!r} must be int")
@@ -55,7 +59,21 @@ def query_string(
     if extra:
         for name, value in extra.items():
             parts.append(f"{name}={_enc(value)}")
+    if allowed_only:
+        parts.append("allowedOnly=true")
+    if inlinecount:
+        parts.append("$inlinecount=allpages")
     return "?" + "&".join(parts)
+
+
+def _key_literal(value: str) -> str:
+    text = str(value)
+    if text.startswith(("guid'", "datetime'")) or (text.startswith("'") and text.endswith("'")):
+        return text
+    try:
+        return guid(text)
+    except ValueError:
+        return "'" + text.replace("'", "''") + "'"
 
 
 def slice_path(

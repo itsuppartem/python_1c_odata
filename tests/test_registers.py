@@ -73,3 +73,19 @@ async def test_accumulation_balance_and_turnovers(fake_odata, infobase):
 
 async def test_accumulation_has_no_slice_last():
     assert not hasattr(AccumulationRegister, "slice_last")
+
+
+async def test_information_get_composite_key_wraps_uuid(fake_odata, infobase):
+    fake_odata.respond(200, {"Курс": 92.1})
+    payload = await InformationRegister(infobase, "КурсыВалют", record_type=True).get(
+        {
+            "Валюта_Key": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "Period": "datetime'2024-03-20T00:00:00'",
+        }
+    )
+    assert payload["Курс"] == 92.1
+    assert fake_odata.last["path"].endswith(
+        "InformationRegister_КурсыВалют_RecordType("
+        "Валюта_Key=guid'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',"
+        "Period=datetime'2024-03-20T00:00:00')"
+    )

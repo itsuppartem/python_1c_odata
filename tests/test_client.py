@@ -56,6 +56,14 @@ async def test_post_sends_json_and_accepts_201(fake_odata, infobase):
     assert "application/json" in fake_odata.last["content_type"]
 
 
+async def test_metadata_fetches_edm_without_json_format(fake_odata, infobase):
+    fake_odata.respond(200, '<?xml version="1.0"?><edmx:Edmx/>')
+    text = await infobase.metadata()
+    assert text.startswith("<?xml")
+    assert fake_odata.last["path"].endswith("/$metadata")
+    assert "$format=json" not in fake_odata.last["query"]
+
+
 async def test_aclose_does_not_close_injected_session(fake_odata):
     import aiohttp
 

@@ -29,6 +29,8 @@ class EntitySet:
         expand: str | None = None,
         orderby: str | None = None,
         extra: Mapping[str, str] | None = None,
+        allowed_only: bool = False,
+        inlinecount: bool = False,
         timeout: float | None = None,
     ) -> Any:
         return await self.infobase.get(
@@ -40,6 +42,8 @@ class EntitySet:
             expand=expand,
             orderby=orderby,
             extra=extra,
+            allowed_only=allowed_only,
+            inlinecount=inlinecount,
             timeout=timeout,
         )
 

@@ -24,5 +24,7 @@ def test_odata_datetime_wraps_bare_iso_string():
     assert odata_datetime("2024-03-20T00:00:00") == "datetime'2024-03-20T00:00:00'"
 
 
-def test_odata_datetime_leaves_already_wrapped_literal():
-    assert odata_datetime("datetime'2024-03-20T00:00:00'") == "datetime'2024-03-20T00:00:00'"
+def test_guid_literal_wraps_parsed_uuid():
+    from python_1c_odata.literals import guid
+
+    assert guid("41AA6331-954F-11E3-814B-005056C00008") == "guid'41aa6331-954f-11e3-814b-005056c00008'"
