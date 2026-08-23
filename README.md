@@ -1,69 +1,86 @@
 # python-1c-odata
 
-A library for working with 1C through the OData protocol. Supports asynchronous operations with documents, catalogs, and registers.
+Async-клиент стандартного OData-интерфейса **1С:Предприятие** (`/odata/standard.odata`).
 
-## Installation
+Платформа говорит на **OData 3.0**: ключи `guid'...'`, даты `datetime'...'`, виртуальные таблицы регистров. Универсальные OData v4-библиотеки здесь обычно ломаются.
+
+## Установка
 
 ```bash
-pip install python-1c-odata
+pip install -e .
 ```
 
-## Key Features
+Нужен Python 3.10+ и aiohttp.
 
-- Asynchronous document operations (create, read, post)
-- Catalog operations (create, read, update)
-- Information and accumulation registers support
-- Filtering, selection, and data expansion support
-
-## Usage Examples
+## Быстрый старт
 
 ```python
 import asyncio
-from python_1c_odata.core import Infobase
-from python_1c_odata.document import Document
-from python_1c_odata.catalog import Catalog
-from python_1c_odata.informationregister import InformationRegister
+from python_1c_odata import (
+    AccumulationRegister,
+    Catalog,
+    Document,
+    Infobase,
+    InformationRegister,
+    PostingMode,
+)
 
-async def main():
-    # Connect to 1C
-    infobase = Infobase(
-        server="http://your-server",
-        infobase="your-infobase",
-        username="your-username",
-        password="your-password"
-    )
+async def main() -> None:
+    async with Infobase("http://1c.example", "ut", "user", "password") as ib:
+        goods = Catalog(ib, "Товары")
+        page = await goods.query(
+            top=10,
+            select="Ref_Key,Description",
+            odata_filter="DeletionMark eq false",
+        )
+        item = await goods.get("41aa6331-954f-11e3-814b-005056c00008")
+        await goods.edit(item["Ref_Key"], {"Description": "Новое имя"})
 
-    # Work with documents
-    doc = Document(infobase, "Document")
-    docs = await doc.query(
-        top=10,
-        select="Ref_Key,Number,Date",
-        odata_filter="Date ge datetime'2024-01-01T00:00:00'"
-    )
+        orders = Document(ib, "ЗаказКлиента")
+        created = await orders.create(
+            {"Date": "2024-03-20T00:00:00"},
+            posting_mode=PostingMode.POST,
+        )
+        await orders.unpost(created["Ref_Key"])
 
-    # Work with catalog
-    catalog = Catalog(infobase, "Catalog")
-    items = await catalog.query(
-        top=100,
-        select="Ref_Key,Description"
-    )
+        rates = await InformationRegister(ib, "КурсыВалют").slice_last(
+            period="2024-03-20T00:00:00",
+            condition="Валюта_Key eq guid'41aa6331-954f-11e3-814b-005056c00008'",
+        )
+        stock = await AccumulationRegister(ib, "ТоварыНаСкладах").balance(
+            period="2024-03-20T00:00:00",
+        )
 
-    # Work with register
-    register = InformationRegister(infobase, "Register")
-    data = await register.slice_last(
-        period="2024-03-20T00:00:00",
-        select="Period,RecordKey,Value"
-    )
-
-if __name__ == "__main__":
-    asyncio.run(main())
+asyncio.run(main())
 ```
 
-## Requirements
+Сессию можно не открывать через `async with`: тогда она создастся на первом запросе. Закройте её `await ib.aclose()`.
 
-- Python 3.7+
-- aiohttp
+## Что умеет
 
-## License
+| Объект | Методы |
+| --- | --- |
+| Справочник `Catalog` | `query`, `get`, `create`, `edit` (PATCH), `replace` (PUT), `delete` |
+| Документ `Document` | то же + `post` / `unpost`. Поле `Posted` в теле писать нельзя — проведение отдельным POST |
+| Регистр сведений | `query` + `slice_last` / `slice_first` (`Period`, `Condition`) |
+| Регистр накопления | `query` + `balance` / `turnovers` / `balance_and_turnovers` |
 
-MIT
+Общие параметры выборки: `top`, `skip`, `select`, `odata_filter`, `expand`, `orderby`.
+
+Ошибки HTTP 4xx/5xx — `ODataError` со статусом и текстом 1С, не «голый» `Exception`.
+
+## Чего нет (пока)
+
+- DSL для `$filter` (строка фильтра — ваша)
+- генерация типов из `$metadata`
+- журналы, бухгалтерия, расчёт, бизнес-процессы
+- синхронный клиент
+
+## Разработка
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+pytest
+```

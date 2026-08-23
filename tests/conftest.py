@@ -1,0 +1,59 @@
+"""Local stand-in for a published 1C infobase. Records what the client actually sent."""
+
+from __future__ import annotations
+
+from aiohttp import web
+from aiohttp.test_utils import TestServer
+import pytest
+
+from python_1c_odata import Infobase
+
+
+class FakeOData:
+    def __init__(self) -> None:
+        self.requests: list[dict] = []
+        self._next: tuple[int, object] = (200, {"value": []})
+        self.base_url = ""
+
+    def respond(self, status: int, payload: object) -> None:
+        self._next = (status, payload)
+
+    async def handle(self, request: web.Request) -> web.StreamResponse:
+        self.requests.append(
+            {
+                "method": request.method,
+                "path": request.path,
+                "query": request.query_string,
+                "body": await request.read(),
+                "authorization": request.headers.get("Authorization", ""),
+                "content_type": request.headers.get("Content-Type", ""),
+            }
+        )
+        status, payload = self._next
+        if isinstance(payload, (bytes, str)):
+            text = payload.decode() if isinstance(payload, bytes) else payload
+            return web.Response(status=status, text=text, content_type="application/json")
+        return web.json_response(payload, status=status)
+
+    @property
+    def last(self) -> dict:
+        return self.requests[-1]
+
+
+@pytest.fixture
+async def fake_odata():
+    fake = FakeOData()
+    app = web.Application()
+    app.router.add_route("*", "/{path:.*}", fake.handle)
+    server = TestServer(app)
+    await server.start_server()
+    fake.base_url = str(server.make_url("/")).rstrip("/")
+    yield fake
+    await server.close()
+
+
+@pytest.fixture
+async def infobase(fake_odata):
+    ib = Infobase(fake_odata.base_url, "ut", "user", "secret")
+    async with ib:
+        yield ib

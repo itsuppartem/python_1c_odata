@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-1c-odata"
+version = "0.2.0"
+description = "Async Python client for the 1C:Enterprise standard OData interface (OData 3.0)"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Artem Guliaev", email = "itsuppartem@yandex.ru" },
+]
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp>=3.9.0",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Framework :: AsyncIO",
+    "Topic :: Software Development :: Libraries",
+]
+keywords = ["1c", "odata", "1c-enterprise", "aiohttp"]
+
+[project.urls]
+Homepage = "https://github.com/itsuppartem/python_1c_odata"
+Repository = "https://github.com/itsuppartem/python_1c_odata"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+python_1c_odata = ["py.typed"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
