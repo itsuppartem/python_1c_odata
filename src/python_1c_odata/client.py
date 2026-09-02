@@ -13,6 +13,7 @@ import aiohttp
 
 from python_1c_odata.errors import ODataError, error_from_response
 from python_1c_odata.literals import parse_guid
+from python_1c_odata.metadata import parse_entity_sets
 from python_1c_odata.url import entity_path, infobase_root, key_path, query_string
 
 _LOG = logging.getLogger("python_1c_odata")
@@ -56,6 +57,7 @@ class Infobase:
         self._ssl = ssl
         self._session = session
         self._owns_session = session is None
+        self._entity_set_names: list[str] | None = None
         self._headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
@@ -238,6 +240,22 @@ class Infobase:
             if response.status != 200:
                 raise error_from_response(response.status, text)
             return text
+
+    async def entity_sets(self, *, timeout: float | None = None) -> list[str]:
+        await self._ensure_entity_sets(timeout=timeout)
+        assert self._entity_set_names is not None
+        return list(self._entity_set_names)
+
+    async def has_entity_set(self, name: str, *, timeout: float | None = None) -> bool:
+        await self._ensure_entity_sets(timeout=timeout)
+        assert self._entity_set_names is not None
+        return name in self._entity_set_names
+
+    async def _ensure_entity_sets(self, *, timeout: float | None = None) -> None:
+        if self._entity_set_names is not None:
+            return
+        xml = await self.metadata(timeout=timeout)
+        self._entity_set_names = [info.name for info in parse_entity_sets(xml)]
 
     def _emit_debug(self, method: str, url: str, status: int, elapsed_ms: float) -> None:
         if not self.debug:

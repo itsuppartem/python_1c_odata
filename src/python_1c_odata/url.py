@@ -107,6 +107,17 @@ def accumulation_virtual_path(
     return f"{entity_path(root, entity)}/{function}({args})"
 
 
+def calculation_virtual_path(
+    root: str,
+    entity: str,
+    function: str,
+    *,
+    condition: str | None = None,
+) -> str:
+    """Calculation register virtual table. 1C OData: ScheduledData, ActualActionPeriod."""
+    return accumulation_virtual_path(root, entity, function, condition=condition)
+
+
 def _quoted_condition(condition: str | None) -> str | None:
     if condition is None:
         return None

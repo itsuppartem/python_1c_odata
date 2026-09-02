@@ -89,6 +89,12 @@ class Filter:
     def substringof(self, needle: object) -> Filter:
         return substringof(needle, self)
 
+    def isof(self, type_name: str) -> Filter:
+        return isof(self, type_name)
+
+    def cast(self, type_name: str) -> Filter:
+        return cast(self, type_name)
+
 
 class F(Filter):
     """Field reference: ``F("Цена") > 1000``, ``F("Ref_Key") == guid("...")``."""
@@ -115,6 +121,16 @@ def contains(haystack: str | Filter, needle: object) -> Filter:
     return substringof(needle, haystack)
 
 
+def isof(field: str | Filter, type_name: str) -> Filter:
+    """OData 3.0: ``isof(Field, 'Edm.String')``."""
+    return Filter(f"isof({_field(field)}, {_type_name(type_name)})")
+
+
+def cast(field: str | Filter, type_name: str) -> Filter:
+    """OData 3.0: ``cast(Field, 'Edm.String')``."""
+    return Filter(f"cast({_field(field)}, {_type_name(type_name)})")
+
+
 def as_filter_text(odata_filter: str | Filter | None) -> str | None:
     if odata_filter is None:
         return None
@@ -123,6 +139,12 @@ def as_filter_text(odata_filter: str | Filter | None) -> str | None:
 
 def _field(value: str | Filter) -> str:
     return value.text if isinstance(value, Filter) else value
+
+
+def _type_name(type_name: str) -> str:
+    if type_name.startswith("'") and type_name.endswith("'"):
+        return type_name
+    return "'" + type_name.replace("'", "''") + "'"
 
 
 def _operand(value: object) -> str:

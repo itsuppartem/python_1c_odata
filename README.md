@@ -5,7 +5,7 @@
 [![CI](https://github.com/itsuppartem/python_1c_odata/actions/workflows/test.yml/badge.svg)](https://github.com/itsuppartem/python_1c_odata/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Async Python client for the **1C:Enterprise** standard OData 3.0 API (`/odata/standard.odata`). Catalogs, documents (post/unpost), registers, journals, charts of accounts, constants, exchange plans. Generic OData v4 clients usually break on 1C literals (`guid'...'`, `datetime'...'`) and virtual register tables.
+Async Python client for the **1C:Enterprise** standard OData 3.0 API (`/odata/standard.odata`). Catalogs, documents (post/unpost), registers, journals, charts, constants, exchange plans, business processes, tasks. Generic OData v4 clients usually break on 1C literals (`guid'...'`, `datetime'...'`) and virtual register tables.
 
 Async-клиент стандартного OData-интерфейса **1С:Предприятие** (`/odata/standard.odata`).
 
@@ -95,7 +95,7 @@ Parenthesize comparisons before `&` / `|` — Python bitwise operators bind tigh
 
 ```python
 from datetime import datetime
-from python_1c_odata import F, contains, endswith, guid, startswith, substringof
+from python_1c_odata import F, cast, contains, endswith, guid, isof, startswith, substringof
 
 F("Цена") > 1000
 (F("Цена") > 1000) & (F("DeletionMark") == False)
@@ -106,6 +106,8 @@ startswith(F("Description"), "Сап")
 endswith(F("Description"), "ги")
 substringof("Сапоги", F("Description"))
 contains(F("Description"), "Сапоги")  # same as substringof (OData 3.0)
+isof(F("Поле"), "Edm.String")
+cast(F("Сумма"), "Edm.Decimal") > 0
 
 await goods.where(F("Цена") > 1000).top(10).select("Ref_Key").execute()
 await goods.count(odata_filter=F("DeletionMark") == False)
@@ -134,6 +136,11 @@ Logs **method**, URL with Cyrillic decoded, **status**, and duration in ms. The 
 | Accumulation register | `query` + `balance` / `turnovers` / `balance_and_turnovers` |
 | Accounting register | same virtual tables as accumulation (`AccountingRegister_*`) |
 | Chart of accounts | same CRUD as a catalog (`ChartOfAccounts_*`) |
+| Chart of characteristic types | same CRUD (`ChartOfCharacteristicTypes_*`) |
+| Chart of calculation types | same CRUD (`ChartOfCalculationTypes_*`) |
+| Business process | same CRUD + `start` (POST `Start`, optional `RoutePoint`) |
+| Task | same CRUD + `execute` (POST `ExecuteTask`) |
+| Calculation register | `query` + `schedule_data` / `actual_action_period` (`ScheduledData`, `ActualActionPeriod`) |
 | Document journal | `query` / `get` / `iterate` / `count` only |
 | Constant | `Constant_*` |
 | Exchange plan | `ExchangePlan_*` |
@@ -144,7 +151,22 @@ Shared query options: `top`, `skip`, `select`, `odata_filter` (str or `F`), `exp
 
 HTTP 4xx/5xx raise `ODataError`. 404 → `EntityNotFound`, 403 → `AccessDenied`, 412 → `ConcurrencyError`.
 
-`$metadata` (XML): `await ib.metadata()`.
+`$metadata` (XML): `await ib.metadata()`. Entity set names (cached after the first fetch):
+
+```python
+from python_1c_odata import BusinessProcess, CalculationRegister, Catalog, Task
+
+names = await ib.entity_sets()
+if await ib.has_entity_set("Catalog_Товары"):
+    goods = Catalog(ib, "Товары")
+
+await BusinessProcess(ib, "СогласованиеЗаказа").start(ref)
+await Task(ib, "ЗадачаИсполнителя").execute(ref)
+await CalculationRegister(ib, "Начисления").schedule_data(
+    condition="Recorder_Key eq guid'41aa6331-954f-11e3-814b-005056c00008'",
+)
+```
+
 GUID in a filter: `guid("41aa-...")` → `guid'41aa-...'`.
 Documents accept both `Date`/`Posted` and `Дата`/`Проведен`.
 
@@ -153,7 +175,6 @@ Documents accept both `Date`/`Posted` and `Дата`/`Проведен`.
 | Missing | Notes |
 | --- | --- |
 | `$metadata` codegen | typed entity classes from EDM |
-| BusinessProcess / Task / CalculationRegister | not wrapped this release |
 | Sync client | this package is asyncio + aiohttp only |
 
 ## Development / Разработка

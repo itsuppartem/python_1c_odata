@@ -4,6 +4,7 @@ import pytest
 
 from python_1c_odata.url import (
     accumulation_virtual_path,
+    calculation_virtual_path,
     entity_path,
     infobase_root,
     key_path,
@@ -113,6 +114,24 @@ def test_accumulation_balance_and_turnovers_use_named_period_params():
         "EndPeriod=datetime'2024-02-01T00:00:00',"
         "Condition='Склад_Key eq guid'aaa'')"
     )
+
+
+def test_calculation_virtual_path_condition_only():
+    url = calculation_virtual_path(
+        "http://h/ib/odata/standard.odata",
+        "CalculationRegister_Начисления",
+        "ScheduledData",
+        condition="Recorder_Key eq guid'aaa'",
+    )
+    assert url.endswith(
+        "CalculationRegister_Начисления/ScheduledData(Condition='Recorder_Key eq guid'aaa'')"
+    )
+    empty = calculation_virtual_path(
+        "http://h/ib/odata/standard.odata",
+        "CalculationRegister_Начисления",
+        "ActualActionPeriod",
+    )
+    assert empty.endswith("CalculationRegister_Начисления/ActualActionPeriod()")
 
 
 def test_query_string_rejects_non_int_top():

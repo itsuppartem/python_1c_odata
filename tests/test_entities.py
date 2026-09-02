@@ -1,13 +1,17 @@
-"""URL prefixes for journals, accounting, constants, charts, exchange plans."""
+"""URL prefixes for journals, accounting, constants, charts, processes, tasks."""
 
 import pytest
 
 from python_1c_odata import (
     AccountingRegister,
+    BusinessProcess,
     ChartOfAccounts,
+    ChartOfCalculationTypes,
+    ChartOfCharacteristicTypes,
     Constant,
     DocumentJournal,
     ExchangePlan,
+    Task,
 )
 
 
@@ -81,3 +85,45 @@ async def test_accounting_turnovers_and_balance_and_turnovers(fake_odata, infoba
 
 async def test_accounting_has_no_slice_last():
     assert not hasattr(AccountingRegister, "slice_last")
+
+
+async def test_chart_of_characteristic_types_prefix(fake_odata, infobase):
+    fake_odata.respond(200, {"value": []})
+    await ChartOfCharacteristicTypes(infobase, "ВидыХарактеристик").query(top=1)
+    assert fake_odata.last["path"].endswith("ChartOfCharacteristicTypes_ВидыХарактеристик")
+
+
+async def test_chart_of_calculation_types_crud_prefix(fake_odata, infobase):
+    fake_odata.respond(201, {"Ref_Key": "abc"})
+    await ChartOfCalculationTypes(infobase, "Начисления").create({"Description": "Оклад"})
+    assert fake_odata.last["method"] == "POST"
+    assert fake_odata.last["path"].endswith("ChartOfCalculationTypes_Начисления")
+
+
+async def test_business_process_start_action(fake_odata, infobase):
+    fake_odata.respond(200, {})
+    await BusinessProcess(infobase, "СогласованиеЗаказа").start(
+        "41aa6331-954f-11e3-814b-005056c00008"
+    )
+    assert fake_odata.last["method"] == "POST"
+    assert fake_odata.last["path"].endswith(
+        "BusinessProcess_СогласованиеЗаказа(guid'41aa6331-954f-11e3-814b-005056c00008')/Start"
+    )
+
+
+async def test_business_process_start_route_point(fake_odata, infobase):
+    fake_odata.respond(200, {})
+    await BusinessProcess(infobase, "СогласованиеЗаказа").start(
+        "41aa6331-954f-11e3-814b-005056c00008",
+        route_point="Согласование",
+    )
+    assert "RoutePoint=Согласование" in fake_odata.last["query"]
+
+
+async def test_task_execute_action(fake_odata, infobase):
+    fake_odata.respond(200, {})
+    await Task(infobase, "ЗадачаИсполнителя").execute("41aa6331-954f-11e3-814b-005056c00008")
+    assert fake_odata.last["method"] == "POST"
+    assert fake_odata.last["path"].endswith(
+        "Task_ЗадачаИсполнителя(guid'41aa6331-954f-11e3-814b-005056c00008')/ExecuteTask"
+    )

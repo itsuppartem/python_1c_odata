@@ -5,7 +5,7 @@ from uuid import UUID
 
 import pytest
 
-from python_1c_odata import F, contains, endswith, guid, startswith, substringof
+from python_1c_odata import F, cast, contains, endswith, guid, isof, startswith, substringof
 from python_1c_odata.filter import Filter
 
 
@@ -63,3 +63,11 @@ def test_unsupported_literal_raises():
 def test_filter_repr_contains_text():
     assert "Цена gt 1" in repr(F("Цена") > 1)
     assert isinstance(F("Цена") > 1, Filter)
+
+
+def test_isof_and_cast_are_odata3():
+    assert str(isof(F("Поле"), "Edm.String")) == "isof(Поле, 'Edm.String')"
+    assert str(cast("Сумма", "Edm.Decimal")) == "cast(Сумма, 'Edm.Decimal')"
+    assert str(F("Поле").isof("Edm.String")) == "isof(Поле, 'Edm.String')"
+    assert str(F("Сумма").cast("Edm.Int32") > 0) == "cast(Сумма, 'Edm.Int32') gt 0"
+    assert str(isof(F("Поле"), "'Edm.String'")) == "isof(Поле, 'Edm.String')"

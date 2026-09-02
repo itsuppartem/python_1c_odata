@@ -1,6 +1,6 @@
 """Register virtual tables: SliceLast is information-only; accumulation uses Balance/Turnovers."""
 
-from python_1c_odata import AccumulationRegister, InformationRegister
+from python_1c_odata import AccumulationRegister, CalculationRegister, InformationRegister
 
 
 async def test_information_slice_last_named_params(fake_odata, infobase):
@@ -73,6 +73,31 @@ async def test_accumulation_balance_and_turnovers(fake_odata, infobase):
 
 async def test_accumulation_has_no_slice_last():
     assert not hasattr(AccumulationRegister, "slice_last")
+
+
+async def test_calculation_register_query_prefix(fake_odata, infobase):
+    fake_odata.respond(200, {"value": []})
+    await CalculationRegister(infobase, "Начисления").query(top=1)
+    assert fake_odata.last["path"].endswith("CalculationRegister_Начисления")
+
+
+async def test_calculation_schedule_data(fake_odata, infobase):
+    fake_odata.respond(200, {"value": [{"Дней": 5}]})
+    payload = await CalculationRegister(infobase, "Начисления").schedule_data(
+        condition="Recorder_Key eq guid'aaa'",
+        select="Дней",
+    )
+    assert payload["value"][0]["Дней"] == 5
+    assert fake_odata.last["path"].endswith(
+        "CalculationRegister_Начисления/ScheduledData(Condition='Recorder_Key eq guid'aaa'')"
+    )
+    assert "$select=Дней" in fake_odata.last["query"]
+
+
+async def test_calculation_actual_action_period(fake_odata, infobase):
+    fake_odata.respond(200, {"value": []})
+    await CalculationRegister(infobase, "Начисления").actual_action_period()
+    assert fake_odata.last["path"].endswith("CalculationRegister_Начисления/ActualActionPeriod()")
 
 
 async def test_information_get_composite_key_wraps_uuid(fake_odata, infobase):
