@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "python-1c-odata"
-version = "0.5.0"
+version = "0.5.1"
 description = "Async Python client for the 1C:Enterprise standard OData interface (OData 3.0)"
-readme = "README.md"
+readme = "README.pypi.md"
 license = "MIT"
 authors = [
     { name = "Artem Gulyaev", email = "itsuppartem@yandex.ru" },

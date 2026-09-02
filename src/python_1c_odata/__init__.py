@@ -37,7 +37,7 @@ from python_1c_odata.presentation import ALL_PRESENTATIONS, presentation
 from python_1c_odata.query import Query
 from python_1c_odata.task import Task
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 __all__ = [
     "ALL_PRESENTATIONS",
     "AccessDenied",
