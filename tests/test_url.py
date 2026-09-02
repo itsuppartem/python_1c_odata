@@ -75,6 +75,16 @@ def test_query_string_omits_none_options():
     assert qs == "?$format=json&$top=1"
 
 
+def test_query_string_atom_format():
+    qs = query_string(odata_format="atom", top=1)
+    assert qs == "?$format=atom&$top=1"
+
+
+def test_query_string_rejects_unknown_format():
+    with pytest.raises(ValueError):
+        query_string(odata_format="auto")
+
+
 def test_query_string_keeps_guid_and_datetime_quotes_in_filter():
     qs = query_string(
         odata_filter="Ref_Key eq guid'41aa6331-954f-11e3-814b-005056c00008'"

@@ -41,13 +41,16 @@ def query_string(
     extra: Mapping[str, str] | None = None,
     allowed_only: bool = False,
     inlinecount: bool = False,
+    odata_format: str = "json",
 ) -> str:
     if top is not None and type(top) is not int:
         raise TypeError(f"top={top!r} must be int")
     if skip is not None and type(skip) is not int:
         raise TypeError(f"skip={skip!r} must be int")
+    if odata_format not in {"json", "atom"}:
+        raise ValueError(f"odata_format={odata_format!r} must be 'json' or 'atom'")
 
-    parts: list[str] = ["$format=json"]
+    parts: list[str] = [f"$format={odata_format}"]
     if top is not None:
         parts.append(f"$top={top}")
     if skip is not None:

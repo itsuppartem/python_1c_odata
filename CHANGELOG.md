@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-09-02
+
+### Added
+
+- Atom/XML codec for 1C:Enterprise 8.3.5: `Infobase(..., format="json" | "atom" | "auto")`. Default stays JSON so existing callers are unchanged.
+- `format="atom"` sends `$format=atom`, `Accept: application/atom+xml`, and writes Atom `<entry>` bodies with `DataServiceVersion: 3.0` / `MaxDataServiceVersion: 3.0`.
+- `format="auto"` still *requests* JSON. If the response is Atom (Content-Type or a `<feed>` / `<entry>` / `<m:error>` / `<?xml` body), it is parsed into the same dicts as JSON (`value`, `odata.count`).
+- Atom `<m:error>` fills `ODataError.internal_code` the same way as JSON `odata.error`. `@odata.bind` on writes stays JSON-only (those keys are skipped on Atom).
+
+### Changed
+
+- Docs state the 8.3.5 limits honestly: Atom does not add `$skip` / `$inlinecount` / `iterate` / `count` / `any` / `all` / presentations / `$expand` to that platform.
+
 ## [0.5.1] - 2026-09-02
 
 ### Changed
@@ -61,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial PyPI release of the async 1C OData client.
 
+[0.6.0]: https://github.com/itsuppartem/python_1c_odata/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/itsuppartem/python_1c_odata/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/itsuppartem/python_1c_odata/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/itsuppartem/python_1c_odata/compare/v0.3.0...v0.4.0

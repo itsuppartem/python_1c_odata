@@ -12,18 +12,18 @@ from python_1c_odata import Infobase
 class FakeOData:
     def __init__(self) -> None:
         self.requests: list[dict] = []
-        self._next: tuple[int, object] = (200, {"value": []})
-        self._queue: list[tuple[int, object]] = []
+        self._next: tuple[int, object, str | None] = (200, {"value": []}, None)
+        self._queue: list[tuple[int, object, str | None]] = []
         self.base_url = ""
 
-    def respond(self, status: int, payload: object) -> None:
+    def respond(self, status: int, payload: object, *, content_type: str | None = None) -> None:
         self._queue = []
-        self._next = (status, payload)
+        self._next = (status, payload, content_type)
 
-    def respond_sequence(self, *responses: tuple[int, object]) -> None:
-        self._queue = list(responses)
-        if responses:
-            self._next = responses[-1]
+    def respond_sequence(self, *responses: tuple) -> None:
+        self._queue = [_normalize_response(item) for item in responses]
+        if self._queue:
+            self._next = self._queue[-1]
 
     async def handle(self, request: web.Request) -> web.StreamResponse:
         self.requests.append(
@@ -34,19 +34,24 @@ class FakeOData:
                 "body": await request.read(),
                 "authorization": request.headers.get("Authorization", ""),
                 "content_type": request.headers.get("Content-Type", ""),
+                "accept": request.headers.get("Accept", ""),
                 "if_match": request.headers.get("If-Match", ""),
                 "data_load_mode": request.headers.get("1C_OData-DataLoadMode", ""),
+                "data_service_version": request.headers.get("DataServiceVersion", ""),
+                "max_data_service_version": request.headers.get("MaxDataServiceVersion", ""),
             }
         )
         if self._queue:
-            status, payload = self._queue.pop(0)
+            status, payload, content_type = self._queue.pop(0)
             if not self._queue:
-                self._next = (status, payload)
+                self._next = (status, payload, content_type)
         else:
-            status, payload = self._next
+            status, payload, content_type = self._next
         if isinstance(payload, (bytes, str)):
             text = payload.decode() if isinstance(payload, bytes) else payload
-            return web.Response(status=status, text=text, content_type="application/json")
+            return web.Response(
+                status=status, text=text, content_type=content_type or "application/json"
+            )
         return web.json_response(payload, status=status)
 
     @property
@@ -66,8 +71,28 @@ async def fake_odata():
     await server.close()
 
 
+def _normalize_response(item: tuple) -> tuple[int, object, str | None]:
+    if len(item) == 2:
+        return item[0], item[1], None
+    return item[0], item[1], item[2]
+
+
 @pytest.fixture
 async def infobase(fake_odata):
     ib = Infobase(fake_odata.base_url, "ut", "user", "secret")
+    async with ib:
+        yield ib
+
+
+@pytest.fixture
+async def atom_infobase(fake_odata):
+    ib = Infobase(fake_odata.base_url, "ut", "user", "secret", format="atom")
+    async with ib:
+        yield ib
+
+
+@pytest.fixture
+async def auto_infobase(fake_odata):
+    ib = Infobase(fake_odata.base_url, "ut", "user", "secret", format="auto")
     async with ib:
         yield ib

@@ -7,7 +7,7 @@ from python_1c_odata.client import Infobase
 from python_1c_odata.entity import EntitySet
 from python_1c_odata.filter import Filter
 from python_1c_odata.literals import odata_datetime
-from python_1c_odata.url import query_string, slice_path
+from python_1c_odata.url import slice_path
 
 
 class InformationRegister(EntitySet):
@@ -80,5 +80,5 @@ class InformationRegister(EntitySet):
             period=None if period is None else odata_datetime(period),
             condition=None if condition is None else str(condition),
         )
-        url = path + query_string(select=select, orderby=orderby, expand=expand)
+        url = path + self.infobase.odata_query_string(select=select, orderby=orderby, expand=expand)
         return await self.infobase.request("GET", url, timeout=timeout)

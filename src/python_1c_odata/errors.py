@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+from python_1c_odata.atom import parse_atom_error
+
 
 class ODataError(Exception):
     def __init__(
@@ -44,6 +46,15 @@ def error_from_response(status: int, text: str) -> ODataError:
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:
+        atom = parse_atom_error(text)
+        if atom is not None:
+            code, atom_message = atom
+            return _BY_STATUS.get(status, ODataError)(
+                status,
+                atom_message or message,
+                body=text,
+                internal_code=_internal_code(code),
+            )
         return _BY_STATUS.get(status, ODataError)(status, message, body=text)
     err = payload.get("odata.error") or payload.get("error") or {}
     raw = err.get("message")

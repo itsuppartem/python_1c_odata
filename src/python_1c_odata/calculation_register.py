@@ -4,7 +4,7 @@ from typing import Any
 
 from python_1c_odata.entity import EntitySet
 from python_1c_odata.filter import Filter
-from python_1c_odata.url import calculation_virtual_path, query_string
+from python_1c_odata.url import calculation_virtual_path
 
 
 class CalculationRegister(EntitySet):
@@ -92,5 +92,5 @@ class CalculationRegister(EntitySet):
             base_register_dimensions=base_register_dimensions,
             view_points=view_points,
         )
-        url = path + query_string(select=select)
+        url = path + self.infobase.odata_query_string(select=select)
         return await self.infobase.request("GET", url, timeout=timeout)

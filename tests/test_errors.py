@@ -56,3 +56,18 @@ async def test_typed_404_keeps_internal_code(fake_odata, infobase):
     with pytest.raises(EntityNotFound) as exc:
         await Catalog(infobase, "Товары").get("41aa6331-954f-11e3-814b-005056c00008")
     assert exc.value.internal_code == "0"
+
+
+async def test_atom_error_fills_internal_code(fake_odata, infobase):
+    fake_odata.respond(
+        400,
+        """<?xml version="1.0"?>
+<m:error xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
+  <m:code>9</m:code>
+  <m:message>Поле Date не заполнено</m:message>
+</m:error>""",
+    )
+    with pytest.raises(ODataError) as exc:
+        await Catalog(infobase, "Товары").create({"Description": "X"})
+    assert exc.value.internal_code == "9"
+    assert "Поле Date не заполнено" in str(exc.value)

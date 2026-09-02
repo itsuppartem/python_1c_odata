@@ -77,6 +77,35 @@ asyncio.run(main())
 
 You can skip `async with`: the session starts on the first request. Close it with `await ib.aclose()`.
 
+## JSON and Atom
+
+Default is JSON (`$format=json`). That is 1C:Enterprise 8.3.6 and newer.
+
+8.3.5 publications speak Atom/XML only. Pass `format="atom"` so the client sends `$format=atom`, `Accept: application/atom+xml`, and writes `<entry>` bodies (`DataServiceVersion: 3.0`).
+
+`format="auto"` still *requests* JSON. If the server answers Atom (Content-Type or a `<feed>` / `<entry>` / `<m:error>` body), the client parses it. Use this when you do not know whether the publication is 8.3.5.
+
+```python
+async with Infobase("http://1c.example", "ut", "user", "password", format="atom") as ib:
+    page = await Catalog(ib, "Товары").query(top=10)
+
+async with Infobase("http://1c.example", "ut", "user", "password", format="auto") as ib:
+    page = await Catalog(ib, "Товары").query(top=10)
+```
+
+`@odata.bind` on writes is JSON-only. Atom writes skip keys that end with `@odata.bind`.
+
+The Atom codec does **not** add `$skip` or `$inlinecount` to 8.3.5. Those options still go on the URL if you ask for them; the platform rejects them.
+
+| 1C:Enterprise | Wire format | What this client can use |
+| --- | --- | --- |
+| 8.3.5 | Atom only | `format="atom"` or `format="auto"`. Basic `query` / `get` / `create` / `edit`. No `iterate` / `count` / `any` / `all` / presentations / `$expand` |
+| 8.3.6+ | JSON available | default `format="json"` |
+| 8.3.8+ | `$skip`, `$inlinecount`, `any` / `all` | `iterate`, `count`, tabular-section filters |
+| 8.3.9+ | `$expand`, `____Presentation` | `expand=`, `presentations=True` |
+
+Not supported: 8.2, 7.7, SOAP, COM, custom HTTP services (`/hs/`), OData 4.
+
 ## Filter DSL
 
 `query(odata_filter="DeletionMark eq false")` still works. The DSL is additive and emits OData 3.0 text (`eq` / `and` / `substringof`, plus `guid'...'` / `datetime'...'`).
@@ -160,7 +189,7 @@ info.keys          # ("Ref_Key",)
 info.properties    # name / type / nullable
 ```
 
-HTTP 4xx/5xx raise `ODataError`. 404 → `EntityNotFound`, 403 → `AccessDenied`, 412 → `ConcurrencyError`. `ODataError.internal_code` is filled from `odata.error.code` / `error.code` when 1C sends it.
+HTTP 4xx/5xx raise `ODataError`. 404 → `EntityNotFound`, 403 → `AccessDenied`, 412 → `ConcurrencyError`. `ODataError.internal_code` is filled from `odata.error.code` / `error.code` / Atom `<m:code>` when 1C sends it.
 
 ## Debug
 
@@ -231,6 +260,7 @@ Documents accept both `Date`/`Posted` and `Дата`/`Проведен`.
 | --- | --- |
 | Full `$metadata` codegen | typed Python classes from EDM (parse + `entity_type_for_set` only) |
 | Sync client | this package is asyncio + aiohttp only |
+| 8.2 / SOAP / COM / `/hs/` / OData 4 | out of scope. Oldest publication we speak is 8.3.5 Atom |
 
 ## Development
 
@@ -328,6 +358,35 @@ asyncio.run(main())
 
 Сессию можно не открывать через `async with`: тогда она создастся на первом запросе. Закройте её `await ib.aclose()`.
 
+## JSON и Atom
+
+По умолчанию JSON (`$format=json`). Так отвечает 1С:Предприятие 8.3.6 и новее.
+
+Публикации 8.3.5 говорят только Atom/XML. Передайте `format="atom"`: клиент шлёт `$format=atom`, `Accept: application/atom+xml` и тела `<entry>` (`DataServiceVersion: 3.0`).
+
+`format="auto"` по-прежнему *просит* JSON. Если сервер отвечает Atom (Content-Type или тело `<feed>` / `<entry>` / `<m:error>`), клиент это разбирает. Так можно зайти, когда неизвестно, 8.3.5 это или нет.
+
+```python
+async with Infobase("http://1c.example", "ut", "user", "password", format="atom") as ib:
+    page = await Catalog(ib, "Товары").query(top=10)
+
+async with Infobase("http://1c.example", "ut", "user", "password", format="auto") as ib:
+    page = await Catalog(ib, "Товары").query(top=10)
+```
+
+`@odata.bind` на записи — только JSON. В Atom такие ключи пропускаются.
+
+Кодек Atom **не** добавляет `$skip` и `$inlinecount` в 8.3.5. Если вы их всё же укажете, они уйдут в URL, и платформа ответит ошибкой.
+
+| 1С:Предприятие | Формат | Что умеет этот клиент |
+| --- | --- | --- |
+| 8.3.5 | только Atom | `format="atom"` или `format="auto"`. Базовые `query` / `get` / `create` / `edit`. Нет `iterate` / `count` / `any` / `all` / представлений / `$expand` |
+| 8.3.6+ | есть JSON | `format="json"` по умолчанию |
+| 8.3.8+ | `$skip`, `$inlinecount`, `any` / `all` | `iterate`, `count`, фильтры табличных частей |
+| 8.3.9+ | `$expand`, `____Presentation` | `expand=`, `presentations=True` |
+
+Не поддерживаются: 8.2, 7.7, SOAP, COM, произвольные HTTP-сервисы (`/hs/`), OData 4.
+
 ## Фильтры
 
 `query(odata_filter="DeletionMark eq false")` по-прежнему принимает строку. DSL — рядом, не вместо: он добавляет OData 3.0-текст (`eq` / `and` / `substringof`, плюс `guid'...'` / `datetime'...'`).
@@ -411,7 +470,7 @@ info.keys          # ("Ref_Key",)
 info.properties    # name / type / nullable
 ```
 
-HTTP 4xx/5xx поднимают `ODataError`. 404 → `EntityNotFound`, 403 → `AccessDenied`, 412 → `ConcurrencyError`. `ODataError.internal_code` заполняется из `odata.error.code` / `error.code`, если 1С его присылает.
+HTTP 4xx/5xx поднимают `ODataError`. 404 → `EntityNotFound`, 403 → `AccessDenied`, 412 → `ConcurrencyError`. `ODataError.internal_code` заполняется из `odata.error.code` / `error.code` / Atom `<m:code>`, если 1С его присылает.
 
 ## Отладка
 
@@ -482,6 +541,7 @@ GUID в фильтре: `guid("41aa-...")` → `guid'41aa-...'`.
 | --- | --- |
 | Полная кодогенерация из `$metadata` | типизированные классы Python из EDM (пока только разбор + `entity_type_for_set`) |
 | Синхронный клиент | пакет только asyncio + aiohttp |
+| 8.2 / SOAP / COM / `/hs/` / OData 4 | вне задачи. Самая старая публикация — Atom 8.3.5 |
 
 ## Разработка
 

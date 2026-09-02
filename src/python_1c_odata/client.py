@@ -12,6 +12,12 @@ from xml.etree import ElementTree
 
 import aiohttp
 
+from python_1c_odata.atom import (
+    decode_atom,
+    encode_entry,
+    looks_like_atom,
+    looks_like_xml_content_type,
+)
 from python_1c_odata.errors import ODataError, error_from_response
 from python_1c_odata.literals import parse_guid
 from python_1c_odata.metadata import EntityTypeInfo, MetadataModel, parse_metadata
@@ -30,6 +36,13 @@ _OK = {
     "DELETE": frozenset({200, 204}),
 }
 
+_FORMATS = frozenset({"json", "atom", "auto"})
+_ATOM_ACCEPT = "application/atom+xml,application/xml"
+_JSON_ACCEPT = "application/json"
+_ATOM_CONTENT = "application/atom+xml"
+_JSON_CONTENT = "application/json"
+_ATOM_VERSION = "3.0"
+
 DebugHook = bool | Callable[[str], object]
 
 
@@ -46,11 +59,15 @@ class Infobase:
         session: aiohttp.ClientSession | None = None,
         debug: DebugHook = False,
         data_load_mode: bool = False,
+        format: str = "json",
     ) -> None:
+        if format not in _FORMATS:
+            raise ValueError(f"format={format!r} must be 'json', 'atom', or 'auto'")
         self.server = server
         self.infobase = infobase
         self.debug = debug
         self.data_load_mode = data_load_mode
+        self.format = format
         self.last_url: str | None = None
         self.last_status: int | None = None
         self._timeout = aiohttp.ClientTimeout(total=timeout)
@@ -59,9 +76,10 @@ class Infobase:
         self._owns_session = session is None
         self._entity_set_names: list[str] | None = None
         self._metadata_model: MetadataModel | None = None
+        atom = format == "atom"
         self._headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
+            "Accept": _ATOM_ACCEPT if atom else _JSON_ACCEPT,
+            "Content-Type": _ATOM_CONTENT if atom else _JSON_CONTENT,
             "Authorization": aiohttp.encode_basic_auth(username, password, encoding="utf-8"),
         }
 
@@ -106,13 +124,23 @@ class Infobase:
         inlinecount = query.pop("inlinecount", False)
         presentations = query.pop("presentations", False)
         select = normalize_select(query.pop("select", None), presentations=bool(presentations))
-        return path + query_string(
+        query.pop("odata_format", None)
+        return path + self.odata_query_string(
             extra=extra,
             allowed_only=bool(allowed_only),
             inlinecount=bool(inlinecount),
             select=select,
             **query,
         )
+
+    def odata_query_string(self, **kwargs: Any) -> str:
+        """``url.query_string`` with this infobase's ``$format`` (json or atom)."""
+        kwargs.pop("odata_format", None)
+        return query_string(odata_format=self._query_format, **kwargs)
+
+    @property
+    def _query_format(self) -> str:
+        return "atom" if self.format == "atom" else "json"
 
     async def get(self, entity: str, *, key: str | Mapping[str, str] | None = None, **query: Any) -> Any:
         timeout = query.pop("timeout", None)
@@ -210,7 +238,13 @@ class Infobase:
         if timeout is not None:
             kwargs["timeout"] = aiohttp.ClientTimeout(total=timeout)
         if json_body is not None:
-            kwargs["json"] = json_body
+            if self.format == "atom":
+                merged["Content-Type"] = _ATOM_CONTENT
+                merged["DataServiceVersion"] = _ATOM_VERSION
+                merged["MaxDataServiceVersion"] = _ATOM_VERSION
+                kwargs["data"] = encode_entry(json_body).encode("utf-8")
+            else:
+                kwargs["json"] = json_body
         assert self._session is not None
         decoded = unquote(url)
         self.last_url = decoded
@@ -224,10 +258,25 @@ class Infobase:
                 raise error_from_response(response.status, text)
             if not text:
                 return None
-            try:
-                return json.loads(text)
-            except ValueError as exc:
-                raise ODataError(response.status, f"invalid JSON: {text[:200]}", body=text) from exc
+            return self._decode_payload(text, response.headers.get("Content-Type", ""), response.status)
+
+    def _decode_payload(self, text: str, content_type: str, status: int) -> Any:
+        if self.format == "atom":
+            return self._decode_atom(text, status)
+        if self.format == "auto" and looks_like_xml_content_type(content_type):
+            return self._decode_atom(text, status)
+        try:
+            return json.loads(text)
+        except ValueError as exc:
+            if self.format == "auto" and looks_like_atom(text):
+                return self._decode_atom(text, status)
+            raise ODataError(status, f"invalid JSON: {text[:200]}", body=text) from exc
+
+    def _decode_atom(self, text: str, status: int) -> Any:
+        try:
+            return decode_atom(text)
+        except (ElementTree.ParseError, ValueError) as exc:
+            raise ODataError(status, f"invalid Atom: {text[:200]}", body=text) from exc
 
     async def metadata(self, *, timeout: float | None = None) -> str:
         await self._ensure_session()

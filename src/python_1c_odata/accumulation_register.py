@@ -6,7 +6,7 @@ from typing import Any
 from python_1c_odata.entity import EntitySet
 from python_1c_odata.filter import Filter
 from python_1c_odata.literals import odata_datetime
-from python_1c_odata.url import accumulation_virtual_path, query_string
+from python_1c_odata.url import accumulation_virtual_path
 
 
 class AccumulationRegister(EntitySet):
@@ -84,5 +84,5 @@ class AccumulationRegister(EntitySet):
             end_period=None if end_period is None else odata_datetime(end_period),
             condition=None if condition is None else str(condition),
         )
-        url = path + query_string(select=select)
+        url = path + self.infobase.odata_query_string(select=select)
         return await self.infobase.request("GET", url, timeout=timeout)
