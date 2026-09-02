@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+import logging
+import time
+from collections.abc import Callable, Mapping
 from typing import Any
+from urllib.parse import unquote
 
 import aiohttp
 
 from python_1c_odata.errors import ODataError, error_from_response
 from python_1c_odata.literals import parse_guid
 from python_1c_odata.url import entity_path, infobase_root, key_path, query_string
+
+_LOG = logging.getLogger("python_1c_odata")
 
 _OK = {
     "GET": frozenset({200}),
@@ -19,6 +24,14 @@ _OK = {
     "PUT": frozenset({200}),
     "DELETE": frozenset({200, 204}),
 }
+
+DebugHook = bool | Callable[[str], object]
+
+
+def _if_match_headers(if_match: str | None) -> dict[str, str] | None:
+    if if_match is None:
+        return None
+    return {"If-Match": if_match}
 
 
 class Infobase:
@@ -32,9 +45,13 @@ class Infobase:
         timeout: float = 30,
         ssl: bool | aiohttp.Fingerprint | None = True,
         session: aiohttp.ClientSession | None = None,
+        debug: DebugHook = False,
     ) -> None:
         self.server = server
         self.infobase = infobase
+        self.debug = debug
+        self.last_url: str | None = None
+        self.last_status: int | None = None
         self._timeout = aiohttp.ClientTimeout(total=timeout)
         self._ssl = ssl
         self._session = session
@@ -119,8 +136,15 @@ class Infobase:
         key: str | Mapping[str, str],
         json: Any,
         timeout: float | None = None,
+        if_match: str | None = None,
     ) -> Any:
-        return await self.request("PATCH", self.url(entity, key=key), json_body=json, timeout=timeout)
+        return await self.request(
+            "PATCH",
+            self.url(entity, key=key),
+            json_body=json,
+            timeout=timeout,
+            headers=_if_match_headers(if_match),
+        )
 
     async def put(
         self,
@@ -129,8 +153,15 @@ class Infobase:
         key: str | Mapping[str, str],
         json: Any,
         timeout: float | None = None,
+        if_match: str | None = None,
     ) -> Any:
-        return await self.request("PUT", self.url(entity, key=key), json_body=json, timeout=timeout)
+        return await self.request(
+            "PUT",
+            self.url(entity, key=key),
+            json_body=json,
+            timeout=timeout,
+            headers=_if_match_headers(if_match),
+        )
 
     async def delete(
         self,
@@ -138,8 +169,14 @@ class Infobase:
         *,
         key: str | Mapping[str, str],
         timeout: float | None = None,
+        if_match: str | None = None,
     ) -> Any:
-        return await self.request("DELETE", self.url(entity, key=key), timeout=timeout)
+        return await self.request(
+            "DELETE",
+            self.url(entity, key=key),
+            timeout=timeout,
+            headers=_if_match_headers(if_match),
+        )
 
     async def request(
         self,
@@ -149,10 +186,14 @@ class Infobase:
         json_body: Any = None,
         timeout: float | None = None,
         ok: set[int] | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> Any:
         await self._ensure_session()
         allowed = ok or _OK[method]
-        kwargs: dict[str, Any] = {"headers": self._headers}
+        merged = dict(self._headers)
+        if headers:
+            merged.update(headers)
+        kwargs: dict[str, Any] = {"headers": merged}
         if self._ssl is not True:
             kwargs["ssl"] = self._ssl
         if timeout is not None:
@@ -160,8 +201,14 @@ class Infobase:
         if json_body is not None:
             kwargs["json"] = json_body
         assert self._session is not None
+        decoded = unquote(url)
+        self.last_url = decoded
+        started = time.perf_counter()
         async with self._session.request(method, url, **kwargs) as response:
             text = await response.text()
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            self.last_status = response.status
+            self._emit_debug(method, decoded, response.status, elapsed_ms)
             if response.status not in allowed:
                 raise error_from_response(response.status, text)
             if not text:
@@ -180,11 +227,26 @@ class Infobase:
         if timeout is not None:
             kwargs["timeout"] = aiohttp.ClientTimeout(total=timeout)
         assert self._session is not None
+        decoded = unquote(url)
+        self.last_url = decoded
+        started = time.perf_counter()
         async with self._session.request("GET", url, **kwargs) as response:
             text = await response.text()
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            self.last_status = response.status
+            self._emit_debug("GET", decoded, response.status, elapsed_ms)
             if response.status != 200:
                 raise error_from_response(response.status, text)
             return text
+
+    def _emit_debug(self, method: str, url: str, status: int, elapsed_ms: float) -> None:
+        if not self.debug:
+            return
+        line = f"{method} {url} {status} {elapsed_ms:.1f}ms"
+        if self.debug is True:
+            _LOG.info(line)
+        elif callable(self.debug):
+            self.debug(line)
 
     async def _ensure_session(self) -> None:
         if self._session is None or self._session.closed:

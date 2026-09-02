@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from urllib.parse import quote
-from typing import Mapping
 
 from python_1c_odata.literals import guid
 

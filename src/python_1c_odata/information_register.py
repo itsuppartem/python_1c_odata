@@ -5,6 +5,7 @@ from typing import Any
 
 from python_1c_odata.client import Infobase
 from python_1c_odata.entity import EntitySet
+from python_1c_odata.filter import Filter
 from python_1c_odata.literals import odata_datetime
 from python_1c_odata.url import query_string, slice_path
 
@@ -24,7 +25,7 @@ class InformationRegister(EntitySet):
     async def slice_last(
         self,
         period: datetime | date | str | None = None,
-        condition: str | None = None,
+        condition: str | Filter | None = None,
         *,
         select: str | None = None,
         orderby: str | None = None,
@@ -44,7 +45,7 @@ class InformationRegister(EntitySet):
     async def slice_first(
         self,
         period: datetime | date | str | None = None,
-        condition: str | None = None,
+        condition: str | Filter | None = None,
         *,
         select: str | None = None,
         orderby: str | None = None,
@@ -65,7 +66,7 @@ class InformationRegister(EntitySet):
         self,
         function: str,
         period: datetime | date | str | None,
-        condition: str | None,
+        condition: str | Filter | None,
         *,
         select: str | None,
         orderby: str | None,
@@ -77,7 +78,7 @@ class InformationRegister(EntitySet):
             self.entity,
             function,
             period=None if period is None else odata_datetime(period),
-            condition=condition,
+            condition=None if condition is None else str(condition),
         )
         url = path + query_string(select=select, orderby=orderby, expand=expand)
         return await self.infobase.request("GET", url, timeout=timeout)

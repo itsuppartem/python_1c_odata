@@ -4,18 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "python-1c-odata"
-version = "0.2.1"
+version = "0.3.0"
 description = "Async Python client for the 1C:Enterprise standard OData interface (OData 3.0)"
 readme = "README.md"
 license = "MIT"
 authors = [
-    { name = "Artem Guliaev", email = "itsuppartem@yandex.ru" },
+    { name = "Artem Gulyaev", email = "itsuppartem@yandex.ru" },
 ]
 requires-python = ">=3.10"
 dependencies = [
     "aiohttp>=3.9.0",
 ]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -24,17 +26,21 @@ classifiers = [
     "Operating System :: OS Independent",
     "Framework :: AsyncIO",
     "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
 ]
-keywords = ["1c", "odata", "1c-enterprise", "aiohttp"]
+keywords = ["1c", "odata", "1c-enterprise", "aiohttp", "odata3", "1c-odata"]
 
 [project.urls]
 Homepage = "https://github.com/itsuppartem/python_1c_odata"
 Repository = "https://github.com/itsuppartem/python_1c_odata"
+Issues = "https://github.com/itsuppartem/python_1c_odata/issues"
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+    "mypy>=1.13",
 ]
 
 [tool.setuptools.packages.find]
@@ -51,3 +57,15 @@ addopts = "-q"
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+pretty = true
+show_error_codes = true
+warn_unused_ignores = true
+check_untyped_defs = true
+no_implicit_optional = true

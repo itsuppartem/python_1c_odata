@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from python_1c_odata.entity import EntitySet
 from python_1c_odata.posting import PostingMode
-
 
 _DATE_FIELDS = ("Date", "Дата")
 _POSTED_FIELDS = ("Posted", "Проведен")
@@ -30,13 +30,14 @@ class Document(EntitySet):
 
     async def edit(
         self,
-        key: str,
+        key: str | Mapping[str, str],
         data: dict[str, Any],
         *,
         timeout: float | None = None,
+        if_match: str | None = None,
     ) -> Any:
         _reject_posted(data)
-        return await super().edit(key, data, timeout=timeout)
+        return await super().edit(key, data, timeout=timeout, if_match=if_match)
 
     async def post(self, key: str, posting_mode: PostingMode, *, timeout: float | None = None) -> Any:
         if posting_mode == PostingMode.UNPOST:

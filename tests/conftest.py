@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
-import pytest
 
 from python_1c_odata import Infobase
 
@@ -13,10 +13,17 @@ class FakeOData:
     def __init__(self) -> None:
         self.requests: list[dict] = []
         self._next: tuple[int, object] = (200, {"value": []})
+        self._queue: list[tuple[int, object]] = []
         self.base_url = ""
 
     def respond(self, status: int, payload: object) -> None:
+        self._queue = []
         self._next = (status, payload)
+
+    def respond_sequence(self, *responses: tuple[int, object]) -> None:
+        self._queue = list(responses)
+        if responses:
+            self._next = responses[-1]
 
     async def handle(self, request: web.Request) -> web.StreamResponse:
         self.requests.append(
@@ -27,9 +34,15 @@ class FakeOData:
                 "body": await request.read(),
                 "authorization": request.headers.get("Authorization", ""),
                 "content_type": request.headers.get("Content-Type", ""),
+                "if_match": request.headers.get("If-Match", ""),
             }
         )
-        status, payload = self._next
+        if self._queue:
+            status, payload = self._queue.pop(0)
+            if not self._queue:
+                self._next = (status, payload)
+        else:
+            status, payload = self._next
         if isinstance(payload, (bytes, str)):
             text = payload.decode() if isinstance(payload, bytes) else payload
             return web.Response(status=status, text=text, content_type="application/json")

@@ -1,0 +1,153 @@
+"""OData 3.0 $filter expressions for 1C (guid/datetime literals, not v4)."""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+from uuid import UUID
+
+from python_1c_odata.literals import guid, odata_datetime
+
+
+class Filter:
+    """Boolean OData 3.0 expression. Combine with ``&``, ``|``, ``~`` (parenthesize comparisons)."""
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def __str__(self) -> str:
+        return self.text
+
+    def __repr__(self) -> str:
+        return f"Filter({self.text!r})"
+
+    def __eq__(self, other: object) -> Filter:  # type: ignore[override]
+        return Filter(f"{self.text} eq {_literal(other)}")
+
+    def __ne__(self, other: object) -> Filter:  # type: ignore[override]
+        return Filter(f"{self.text} ne {_literal(other)}")
+
+    def __gt__(self, other: object) -> Filter:
+        return Filter(f"{self.text} gt {_literal(other)}")
+
+    def __ge__(self, other: object) -> Filter:
+        return Filter(f"{self.text} ge {_literal(other)}")
+
+    def __lt__(self, other: object) -> Filter:
+        return Filter(f"{self.text} lt {_literal(other)}")
+
+    def __le__(self, other: object) -> Filter:
+        return Filter(f"{self.text} le {_literal(other)}")
+
+    def __and__(self, other: object) -> Filter:
+        return Filter(f"({self.text}) and ({_operand(other)})")
+
+    def __or__(self, other: object) -> Filter:
+        return Filter(f"({self.text}) or ({_operand(other)})")
+
+    def __rand__(self, other: object) -> Filter:
+        return Filter(f"({_operand(other)}) and ({self.text})")
+
+    def __ror__(self, other: object) -> Filter:
+        return Filter(f"({_operand(other)}) or ({self.text})")
+
+    def __invert__(self) -> Filter:
+        return Filter(f"not ({self.text})")
+
+    def eq(self, other: object) -> Filter:
+        return self == other
+
+    def ne(self, other: object) -> Filter:
+        return self != other
+
+    def gt(self, other: object) -> Filter:
+        return self > other
+
+    def ge(self, other: object) -> Filter:
+        return self >= other
+
+    def lt(self, other: object) -> Filter:
+        return self < other
+
+    def le(self, other: object) -> Filter:
+        return self <= other
+
+    def and_(self, other: object) -> Filter:
+        return self & other
+
+    def or_(self, other: object) -> Filter:
+        return self | other
+
+    def startswith(self, value: object) -> Filter:
+        return startswith(self, value)
+
+    def endswith(self, value: object) -> Filter:
+        return endswith(self, value)
+
+    def contains(self, value: object) -> Filter:
+        return contains(self, value)
+
+    def substringof(self, needle: object) -> Filter:
+        return substringof(needle, self)
+
+
+class F(Filter):
+    """Field reference: ``F("Цена") > 1000``, ``F("Ref_Key") == guid("...")``."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+
+
+def startswith(field: str | Filter, value: object) -> Filter:
+    return Filter(f"startswith({_field(field)}, {_literal(value)})")
+
+
+def endswith(field: str | Filter, value: object) -> Filter:
+    return Filter(f"endswith({_field(field)}, {_literal(value)})")
+
+
+def substringof(needle: object, haystack: str | Filter) -> Filter:
+    """OData 3.0: ``substringof(needle, haystack)``."""
+    return Filter(f"substringof({_literal(needle)}, {_field(haystack)})")
+
+
+def contains(haystack: str | Filter, needle: object) -> Filter:
+    """OData 3.0 spelling of contains: ``substringof(needle, haystack)``."""
+    return substringof(needle, haystack)
+
+
+def as_filter_text(odata_filter: str | Filter | None) -> str | None:
+    if odata_filter is None:
+        return None
+    return str(odata_filter)
+
+
+def _field(value: str | Filter) -> str:
+    return value.text if isinstance(value, Filter) else value
+
+
+def _operand(value: object) -> str:
+    if isinstance(value, Filter):
+        return value.text
+    return _literal(value)
+
+
+def _literal(value: object) -> str:
+    if isinstance(value, Filter):
+        return value.text
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return str(value)
+    if isinstance(value, UUID):
+        return guid(str(value))
+    if isinstance(value, (datetime, date)):
+        return odata_datetime(value)
+    if isinstance(value, str):
+        if value.startswith(("guid'", "datetime'")):
+            return value
+        return "'" + value.replace("'", "''") + "'"
+    raise TypeError(f"unsupported filter literal: {value!r}")
