@@ -1,5 +1,7 @@
 # python-1c-odata
 
+English | [Русский](README.ru.md)
+
 [![PyPI](https://img.shields.io/pypi/v/python-1c-odata.svg)](https://pypi.org/project/python-1c-odata/)
 [![Python versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://github.com/itsuppartem/python_1c_odata)
 [![CI](https://github.com/itsuppartem/python_1c_odata/actions/workflows/test.yml/badge.svg)](https://github.com/itsuppartem/python_1c_odata/actions/workflows/test.yml)
@@ -7,13 +9,9 @@
 
 Async Python client for the **1C:Enterprise** standard OData 3.0 API (`/odata/standard.odata`). Catalogs, documents (post/unpost), registers, journals, charts, constants, exchange plans, business processes, tasks. Generic OData v4 clients usually break on 1C literals (`guid'...'`, `datetime'...'`) and virtual register tables.
 
-Async-клиент стандартного OData-интерфейса **1С:Предприятие** (`/odata/standard.odata`).
-
-Платформа говорит на **OData 3.0**: ключи `guid'...'`, даты `datetime'...'`, виртуальные таблицы регистров. Универсальные OData v4-библиотеки здесь обычно ломаются.
-
 Homepage / repo: https://github.com/itsuppartem/python_1c_odata
 
-## Install / Установка
+## Install
 
 ```bash
 pip install python-1c-odata
@@ -21,9 +19,7 @@ pip install python-1c-odata
 
 Python 3.10+ and aiohttp. For a clone: `pip install -e ".[dev]"`.
 
-Нужен Python 3.10+ и aiohttp.
-
-## Quick start / Быстрый старт
+## Quick start
 
 ```python
 import asyncio
@@ -81,17 +77,11 @@ asyncio.run(main())
 
 You can skip `async with`: the session starts on the first request. Close it with `await ib.aclose()`.
 
-Сессию можно не открывать через `async with`: тогда она создастся на первом запросе. Закройте её `await ib.aclose()`.
-
-## Filter DSL / Фильтры
+## Filter DSL
 
 `query(odata_filter="DeletionMark eq false")` still works. The DSL is additive and emits OData 3.0 text (`eq` / `and` / `substringof`, plus `guid'...'` / `datetime'...'`).
 
-`query(odata_filter="...")` как и раньше принимает строку. DSL — рядом, не вместо.
-
 Parenthesize comparisons before `&` / `|` — Python bitwise operators bind tighter than `>` / `==`.
-
-Сравнения в скобках: у `&` / `|` приоритет выше, чем у `>` / `==`.
 
 ```python
 from datetime import datetime
@@ -112,16 +102,14 @@ cast(F("Сумма"), "Edm.Decimal") > 0
 await goods.where(F("Цена") > 1000).top(10).select("Ref_Key").execute()
 await goods.count(odata_filter=F("DeletionMark") == False)
 
-# tabular sections / табличные части
+# tabular sections
 F("Товары").any(F("Цена") > 10000)   # Товары/any(d: d/Цена gt 10000)
 F("Товары").all(F("Количество") > 0)
 ```
 
-## Presentations / Представления
+## Presentations
 
 1C exposes `Name____Presentation` (four underscores). `$select=*, *____Presentation` returns values and presentations.
-
-У 1С поле представления — `Имя____Presentation` (четыре подчёркивания).
 
 ```python
 from python_1c_odata import ALL_PRESENTATIONS, presentation
@@ -139,8 +127,6 @@ print(goods.url(select="*", presentations=True))  # no HTTP request
 
 Use on PUT/replace (and other writes) to point at an existing entity, or to fill a ValueStorage field.
 
-Для ссылок на существующий объект и для полей хранилища значений:
-
 ```python
 from python_1c_odata import base64_data, bind_field, odata_bind
 
@@ -156,11 +142,9 @@ await goods.replace(
 )
 ```
 
-## Data load mode / Режим загрузки
+## Data load mode
 
 Header `1C_OData-DataLoadMode: true` emulates `ОбменДанными.Загрузка`. Sent only on POST/PATCH/PUT/DELETE.
-
-Заголовок только на записи. По умолчанию выключен.
 
 ```python
 ib = Infobase("http://1c.example", "ut", "user", "password", data_load_mode=True)
@@ -189,11 +173,9 @@ print(ib.last_url, ib.last_status)
 
 Logs **method**, URL with Cyrillic decoded, **status**, and duration in ms. The `Authorization` header is never written.
 
-В лог: метод, URL (кириллица читаемая), статус, миллисекунды. Заголовок `Authorization` не пишется.
+## What it does
 
-## What it does / Что умеет
-
-| Object / Объект | Methods / Методы |
+| Object | Methods |
 | --- | --- |
 | Catalog | `query`, `iterate`, `count`, `get`, `create`, `edit` (PATCH), `replace` (PUT), `delete` |
 | Document | same + `post` / `unpost`. Do not send `Posted` / `Проведен` — posting is a separate POST |
@@ -243,14 +225,14 @@ await CalculationRegister(ib, "Начисления").base(
 GUID in a filter: `guid("41aa-...")` → `guid'41aa-...'`.
 Documents accept both `Date`/`Posted` and `Дата`/`Проведен`.
 
-## What is still missing / Чего нет (пока)
+## What is still missing
 
 | Missing | Notes |
 | --- | --- |
 | Full `$metadata` codegen | typed Python classes from EDM (parse + `entity_type_for_set` only) |
 | Sync client | this package is asyncio + aiohttp only |
 
-## Development / Разработка
+## Development
 
 ```bash
 python -m venv .venv
