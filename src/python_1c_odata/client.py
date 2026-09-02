@@ -8,15 +8,19 @@ import time
 from collections.abc import Callable, Mapping
 from typing import Any
 from urllib.parse import unquote
+from xml.etree import ElementTree
 
 import aiohttp
 
 from python_1c_odata.errors import ODataError, error_from_response
 from python_1c_odata.literals import parse_guid
-from python_1c_odata.metadata import parse_entity_sets
+from python_1c_odata.metadata import EntityTypeInfo, MetadataModel, parse_metadata
+from python_1c_odata.presentation import normalize_select
 from python_1c_odata.url import entity_path, infobase_root, key_path, query_string
 
 _LOG = logging.getLogger("python_1c_odata")
+
+DATA_LOAD_MODE_HEADER = "1C_OData-DataLoadMode"
 
 _OK = {
     "GET": frozenset({200}),
@@ -27,12 +31,6 @@ _OK = {
 }
 
 DebugHook = bool | Callable[[str], object]
-
-
-def _if_match_headers(if_match: str | None) -> dict[str, str] | None:
-    if if_match is None:
-        return None
-    return {"If-Match": if_match}
 
 
 class Infobase:
@@ -47,10 +45,12 @@ class Infobase:
         ssl: bool | aiohttp.Fingerprint | None = True,
         session: aiohttp.ClientSession | None = None,
         debug: DebugHook = False,
+        data_load_mode: bool = False,
     ) -> None:
         self.server = server
         self.infobase = infobase
         self.debug = debug
+        self.data_load_mode = data_load_mode
         self.last_url: str | None = None
         self.last_status: int | None = None
         self._timeout = aiohttp.ClientTimeout(total=timeout)
@@ -58,6 +58,7 @@ class Infobase:
         self._session = session
         self._owns_session = session is None
         self._entity_set_names: list[str] | None = None
+        self._metadata_model: MetadataModel | None = None
         self._headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
@@ -103,10 +104,13 @@ class Infobase:
         extra = query.pop("extra", None)
         allowed_only = query.pop("allowed_only", False)
         inlinecount = query.pop("inlinecount", False)
+        presentations = query.pop("presentations", False)
+        select = normalize_select(query.pop("select", None), presentations=bool(presentations))
         return path + query_string(
             extra=extra,
             allowed_only=bool(allowed_only),
             inlinecount=bool(inlinecount),
+            select=select,
             **query,
         )
 
@@ -123,12 +127,14 @@ class Infobase:
         action: str | None = None,
         extra: Mapping[str, str] | None = None,
         timeout: float | None = None,
+        data_load_mode: bool | None = None,
     ) -> Any:
         return await self.request(
             "POST",
             self.url(entity, key=key, action=action, extra=extra),
             json_body=json,
             timeout=timeout,
+            headers=self._write_headers(data_load_mode=data_load_mode),
         )
 
     async def patch(
@@ -139,13 +145,14 @@ class Infobase:
         json: Any,
         timeout: float | None = None,
         if_match: str | None = None,
+        data_load_mode: bool | None = None,
     ) -> Any:
         return await self.request(
             "PATCH",
             self.url(entity, key=key),
             json_body=json,
             timeout=timeout,
-            headers=_if_match_headers(if_match),
+            headers=self._write_headers(if_match=if_match, data_load_mode=data_load_mode),
         )
 
     async def put(
@@ -156,13 +163,14 @@ class Infobase:
         json: Any,
         timeout: float | None = None,
         if_match: str | None = None,
+        data_load_mode: bool | None = None,
     ) -> Any:
         return await self.request(
             "PUT",
             self.url(entity, key=key),
             json_body=json,
             timeout=timeout,
-            headers=_if_match_headers(if_match),
+            headers=self._write_headers(if_match=if_match, data_load_mode=data_load_mode),
         )
 
     async def delete(
@@ -172,12 +180,13 @@ class Infobase:
         key: str | Mapping[str, str],
         timeout: float | None = None,
         if_match: str | None = None,
+        data_load_mode: bool | None = None,
     ) -> Any:
         return await self.request(
             "DELETE",
             self.url(entity, key=key),
             timeout=timeout,
-            headers=_if_match_headers(if_match),
+            headers=self._write_headers(if_match=if_match, data_load_mode=data_load_mode),
         )
 
     async def request(
@@ -239,23 +248,52 @@ class Infobase:
             self._emit_debug("GET", decoded, response.status, elapsed_ms)
             if response.status != 200:
                 raise error_from_response(response.status, text)
+            try:
+                self._apply_metadata(text)
+            except ElementTree.ParseError:
+                pass
             return text
 
     async def entity_sets(self, *, timeout: float | None = None) -> list[str]:
-        await self._ensure_entity_sets(timeout=timeout)
+        await self._ensure_metadata(timeout=timeout)
         assert self._entity_set_names is not None
         return list(self._entity_set_names)
 
     async def has_entity_set(self, name: str, *, timeout: float | None = None) -> bool:
-        await self._ensure_entity_sets(timeout=timeout)
+        await self._ensure_metadata(timeout=timeout)
         assert self._entity_set_names is not None
         return name in self._entity_set_names
 
-    async def _ensure_entity_sets(self, *, timeout: float | None = None) -> None:
-        if self._entity_set_names is not None:
+    async def entity_type_for_set(self, name: str, *, timeout: float | None = None) -> EntityTypeInfo:
+        await self._ensure_metadata(timeout=timeout)
+        assert self._metadata_model is not None
+        info = self._metadata_model.entity_type_for_set(name)
+        if info is None:
+            raise KeyError(name)
+        return info
+
+    def _write_headers(
+        self,
+        *,
+        if_match: str | None = None,
+        data_load_mode: bool | None = None,
+    ) -> dict[str, str] | None:
+        headers: dict[str, str] = {}
+        if if_match is not None:
+            headers["If-Match"] = if_match
+        enabled = self.data_load_mode if data_load_mode is None else data_load_mode
+        if enabled:
+            headers[DATA_LOAD_MODE_HEADER] = "true"
+        return headers or None
+
+    def _apply_metadata(self, xml: str) -> None:
+        self._metadata_model = parse_metadata(xml)
+        self._entity_set_names = [info.name for info in self._metadata_model.entity_sets]
+
+    async def _ensure_metadata(self, *, timeout: float | None = None) -> None:
+        if self._metadata_model is not None:
             return
-        xml = await self.metadata(timeout=timeout)
-        self._entity_set_names = [info.name for info in parse_entity_sets(xml)]
+        await self.metadata(timeout=timeout)
 
     def _emit_debug(self, method: str, url: str, status: int, elapsed_ms: float) -> None:
         if not self.debug:

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from python_1c_odata.filter import Filter
 from python_1c_odata.page import Page
+from python_1c_odata.presentation import SelectFields
 
 if TYPE_CHECKING:
     from python_1c_odata.entity import EntitySet
@@ -17,13 +18,14 @@ class Query:
         self._entity_set = entity_set
         self._top: int | None = None
         self._skip: int | None = None
-        self._select: str | None = None
+        self._select: SelectFields | None = None
         self._odata_filter: str | Filter | None = None
         self._expand: str | None = None
         self._orderby: str | None = None
         self._extra: Mapping[str, str] | None = None
         self._allowed_only = False
         self._inlinecount = False
+        self._presentations = False
 
     def where(self, expr: str | Filter) -> Query:
         self._odata_filter = expr
@@ -37,7 +39,7 @@ class Query:
         self._skip = n
         return self
 
-    def select(self, fields: str) -> Query:
+    def select(self, fields: SelectFields) -> Query:
         self._select = fields
         return self
 
@@ -61,6 +63,10 @@ class Query:
         self._inlinecount = enabled
         return self
 
+    def presentations(self, enabled: bool = True) -> Query:
+        self._presentations = enabled
+        return self
+
     async def execute(self) -> Page:
         return await self._entity_set.query(**self._kwargs())
 
@@ -82,6 +88,7 @@ class Query:
             orderby=self._orderby,
             extra=self._extra,
             allowed_only=self._allowed_only,
+            presentations=self._presentations,
         )
 
     def _kwargs(self) -> dict[str, Any]:
@@ -95,4 +102,5 @@ class Query:
             "extra": self._extra,
             "allowed_only": self._allowed_only,
             "inlinecount": self._inlinecount,
+            "presentations": self._presentations,
         }

@@ -100,6 +100,35 @@ async def test_calculation_actual_action_period(fake_odata, infobase):
     assert fake_odata.last["path"].endswith("CalculationRegister_Начисления/ActualActionPeriod()")
 
 
+async def test_calculation_recalculation(fake_odata, infobase):
+    fake_odata.respond(200, {"value": []})
+    await CalculationRegister(infobase, "Начисления").recalculation(
+        condition="Recorder_Key eq guid'aaa'",
+    )
+    assert fake_odata.last["path"].endswith(
+        "CalculationRegister_Начисления/Recalculation(Condition='Recorder_Key eq guid'aaa'')"
+    )
+
+
+async def test_calculation_base_named_params(fake_odata, infobase):
+    fake_odata.respond(200, {"value": []})
+    await CalculationRegister(infobase, "Начисления").base(
+        condition="ФизЛицо_Key eq guid'aaa'",
+        main_register_dimensions="ФизЛицо,Организация",
+        base_register_dimensions="Сотрудник,Организация",
+        view_points="Результат",
+        select="РезультатBase",
+    )
+    assert fake_odata.last["path"].endswith(
+        "CalculationRegister_Начисления/Base("
+        "Condition='ФизЛицо_Key eq guid'aaa'',"
+        "MainRegisterDimensions='ФизЛицо,Организация',"
+        "BaseRegisterDimensions='Сотрудник,Организация',"
+        "ViewPoints='Результат')"
+    )
+    assert "$select=РезультатBase" in fake_odata.last["query"]
+
+
 async def test_information_get_composite_key_wraps_uuid(fake_odata, infobase):
     fake_odata.respond(200, {"Курс": 92.1})
     payload = await InformationRegister(infobase, "КурсыВалют", record_type=True).get(

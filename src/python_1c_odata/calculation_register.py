@@ -38,6 +38,40 @@ class CalculationRegister(EntitySet):
             timeout=timeout,
         )
 
+    async def recalculation(
+        self,
+        condition: str | Filter | None = None,
+        *,
+        select: str | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        return await self._virtual(
+            "Recalculation",
+            condition=condition,
+            select=select,
+            timeout=timeout,
+        )
+
+    async def base(
+        self,
+        condition: str | Filter | None = None,
+        *,
+        main_register_dimensions: str | None = None,
+        base_register_dimensions: str | None = None,
+        view_points: str | None = None,
+        select: str | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        return await self._virtual(
+            "Base",
+            condition=condition,
+            main_register_dimensions=main_register_dimensions,
+            base_register_dimensions=base_register_dimensions,
+            view_points=view_points,
+            select=select,
+            timeout=timeout,
+        )
+
     async def _virtual(
         self,
         function: str,
@@ -45,12 +79,18 @@ class CalculationRegister(EntitySet):
         condition: str | Filter | None,
         select: str | None,
         timeout: float | None,
+        main_register_dimensions: str | None = None,
+        base_register_dimensions: str | None = None,
+        view_points: str | None = None,
     ) -> Any:
         path = calculation_virtual_path(
             self.infobase.root,
             self.entity,
             function,
             condition=None if condition is None else str(condition),
+            main_register_dimensions=main_register_dimensions,
+            base_register_dimensions=base_register_dimensions,
+            view_points=view_points,
         )
         url = path + query_string(select=select)
         return await self.infobase.request("GET", url, timeout=timeout)

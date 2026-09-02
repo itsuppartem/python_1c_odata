@@ -31,3 +31,28 @@ async def test_412_is_concurrency_error(fake_odata, infobase):
         )
     assert exc.value.status == 412
     assert isinstance(exc.value, ODataError)
+
+
+async def test_odata_error_parses_internal_code(fake_odata, infobase):
+    fake_odata.respond(
+        400,
+        {
+            "odata.error": {
+                "code": "9",
+                "message": {"lang": "ru", "value": "Поле Date не заполнено"},
+            }
+        },
+    )
+    with pytest.raises(ODataError) as exc:
+        await Catalog(infobase, "Товары").create({"Description": "X"})
+    assert exc.value.status == 400
+    assert exc.value.internal_code == "9"
+    assert "Поле Date не заполнено" in str(exc.value)
+    assert exc.value.__class__ is ODataError
+
+
+async def test_typed_404_keeps_internal_code(fake_odata, infobase):
+    fake_odata.respond(404, {"error": {"code": 0, "message": "missing"}})
+    with pytest.raises(EntityNotFound) as exc:
+        await Catalog(infobase, "Товары").get("41aa6331-954f-11e3-814b-005056c00008")
+    assert exc.value.internal_code == "0"

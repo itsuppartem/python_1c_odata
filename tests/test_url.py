@@ -5,6 +5,7 @@ import pytest
 from python_1c_odata.url import (
     accumulation_virtual_path,
     calculation_virtual_path,
+    entity_key,
     entity_path,
     infobase_root,
     key_path,
@@ -113,6 +114,41 @@ def test_accumulation_balance_and_turnovers_use_named_period_params():
         "StartPeriod=datetime'2024-01-01T00:00:00',"
         "EndPeriod=datetime'2024-02-01T00:00:00',"
         "Condition='Склад_Key eq guid'aaa'')"
+    )
+
+
+def test_entity_key_matches_bind_form():
+    assert entity_key("Catalog_Организации", "41aa6331-954f-11e3-814b-005056c00008") == (
+        "Catalog_Организации(guid'41aa6331-954f-11e3-814b-005056c00008')"
+    )
+
+
+def test_calculation_virtual_path_recalculation_and_base():
+    root = "http://h/ib/odata/standard.odata"
+    recalc = calculation_virtual_path(
+        root,
+        "CalculationRegister_Начисления",
+        "Recalculation",
+        condition="Recorder_Key eq guid'aaa'",
+    )
+    assert recalc.endswith(
+        "CalculationRegister_Начисления/Recalculation(Condition='Recorder_Key eq guid'aaa'')"
+    )
+    base = calculation_virtual_path(
+        root,
+        "CalculationRegister_Начисления",
+        "Base",
+        condition="ФизЛицо_Key eq guid'aaa'",
+        main_register_dimensions="ФизЛицо",
+        base_register_dimensions="Сотрудник",
+        view_points="Результат",
+    )
+    assert base.endswith(
+        "CalculationRegister_Начисления/Base("
+        "Condition='ФизЛицо_Key eq guid'aaa'',"
+        "MainRegisterDimensions='ФизЛицо',"
+        "BaseRegisterDimensions='Сотрудник',"
+        "ViewPoints='Результат')"
     )
 
 

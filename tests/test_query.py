@@ -90,6 +90,13 @@ async def test_count_raises_when_server_omits_inlinecount(fake_odata, infobase):
         await Catalog(infobase, "Товары").count()
 
 
+async def test_query_sends_any_filter_text(fake_odata, infobase):
+    fake_odata.respond(200, {"value": []})
+    await Catalog(infobase, "Заказы").query(odata_filter=F("Товары").any(F("Цена") > 10000))
+    qs = parse_qs(fake_odata.last["query"], keep_blank_values=True)
+    assert qs["$filter"] == ["Товары/any(d: d/Цена gt 10000)"]
+
+
 async def test_builder_count_and_iterate(fake_odata, infobase):
     fake_odata.respond(200, {"value": [{"i": 1}], "__count": "1"})
     catalog = Catalog(infobase, "Товары")

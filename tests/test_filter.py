@@ -5,7 +5,18 @@ from uuid import UUID
 
 import pytest
 
-from python_1c_odata import F, cast, contains, endswith, guid, isof, startswith, substringof
+from python_1c_odata import (
+    F,
+    all_,
+    any_,
+    cast,
+    contains,
+    endswith,
+    guid,
+    isof,
+    startswith,
+    substringof,
+)
 from python_1c_odata.filter import Filter
 
 
@@ -71,3 +82,20 @@ def test_isof_and_cast_are_odata3():
     assert str(F("Поле").isof("Edm.String")) == "isof(Поле, 'Edm.String')"
     assert str(F("Сумма").cast("Edm.Int32") > 0) == "cast(Сумма, 'Edm.Int32') gt 0"
     assert str(isof(F("Поле"), "'Edm.String'")) == "isof(Поле, 'Edm.String')"
+
+
+def test_any_all_tabular_section_uses_lambda_d():
+    assert str(F("Товары").any(F("Цена") > 10000)) == "Товары/any(d: d/Цена gt 10000)"
+    assert str(F("Товары").all(F("Цена") > 10000)) == "Товары/all(d: d/Цена gt 10000)"
+    assert str(any_(F("Товары"), F("Цена") > 10000)) == "Товары/any(d: d/Цена gt 10000)"
+    assert str(all_("Товары", F("Количество") > 0)) == "Товары/all(d: d/Количество gt 0)"
+
+
+def test_any_prefixes_compound_and_guid_fields():
+    ref = "41aa6331-954f-11e3-814b-005056c00008"
+    expr = F("Товары").any((F("Цена") > 10000) & (F("Номенклатура_Key") == guid(ref)))
+    assert str(expr) == (
+        f"Товары/any(d: (d/Цена gt 10000) and (d/Номенклатура_Key eq guid'{ref}'))"
+    )
+    already = F("Товары").any("d/Цена gt 1")
+    assert str(already) == "Товары/any(d: d/Цена gt 1)"

@@ -6,10 +6,17 @@ import json
 
 
 class ODataError(Exception):
-    def __init__(self, status: int, message: str, body: str | None = None) -> None:
+    def __init__(
+        self,
+        status: int,
+        message: str,
+        body: str | None = None,
+        internal_code: str | None = None,
+    ) -> None:
         self.status = status
         self.message = message
         self.body = body
+        self.internal_code = internal_code
         super().__init__(f"HTTP {status}: {message}")
 
 
@@ -44,4 +51,13 @@ def error_from_response(status: int, text: str) -> ODataError:
         message = str(raw.get("value") or message)
     elif isinstance(raw, str) and raw:
         message = raw
-    return _BY_STATUS.get(status, ODataError)(status, message, body=text)
+    internal_code = _internal_code(err.get("code"))
+    return _BY_STATUS.get(status, ODataError)(
+        status, message, body=text, internal_code=internal_code
+    )
+
+
+def _internal_code(raw: object) -> str | None:
+    if raw is None or raw == "":
+        return None
+    return str(raw)

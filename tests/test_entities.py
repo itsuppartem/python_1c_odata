@@ -10,6 +10,7 @@ from python_1c_odata import (
     ChartOfCharacteristicTypes,
     Constant,
     DocumentJournal,
+    Enumeration,
     ExchangePlan,
     Task,
 )
@@ -30,6 +31,18 @@ async def test_document_journal_is_read_only_query(fake_odata, infobase):
         await journal.create({"Date": "2024-01-01T00:00:00"})
     with pytest.raises(TypeError, match="read-only"):
         await journal.edit("41aa6331-954f-11e3-814b-005056c00008", {"Number": "1"})
+    assert len(fake_odata.requests) == 1
+
+
+async def test_enumeration_is_read_only_query(fake_odata, infobase):
+    fake_odata.respond(200, {"value": []})
+    enums = Enumeration(infobase, "СтавкиНДС")
+    await enums.query(top=5)
+    assert fake_odata.last["path"].endswith("Enumeration_СтавкиНДС")
+    with pytest.raises(TypeError, match="read-only"):
+        await enums.create({"Description": "20%"})
+    with pytest.raises(TypeError, match="read-only"):
+        await enums.delete("41aa6331-954f-11e3-814b-005056c00008")
     assert len(fake_odata.requests) == 1
 
 

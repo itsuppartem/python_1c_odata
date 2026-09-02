@@ -19,11 +19,12 @@ class Document(EntitySet):
         *,
         posting_mode: PostingMode = PostingMode.UNPOST,
         timeout: float | None = None,
+        data_load_mode: bool | None = None,
     ) -> Any:
         _reject_posted(data)
         if not any(field in data for field in _DATE_FIELDS):
             raise ValueError("Date cannot be empty")
-        created = await super().create(data, timeout=timeout)
+        created = await super().create(data, timeout=timeout, data_load_mode=data_load_mode)
         if posting_mode != PostingMode.UNPOST:
             await self.post(created["Ref_Key"], posting_mode, timeout=timeout)
         return created
@@ -35,9 +36,12 @@ class Document(EntitySet):
         *,
         timeout: float | None = None,
         if_match: str | None = None,
+        data_load_mode: bool | None = None,
     ) -> Any:
         _reject_posted(data)
-        return await super().edit(key, data, timeout=timeout, if_match=if_match)
+        return await super().edit(
+            key, data, timeout=timeout, if_match=if_match, data_load_mode=data_load_mode
+        )
 
     async def post(self, key: str, posting_mode: PostingMode, *, timeout: float | None = None) -> Any:
         if posting_mode == PostingMode.UNPOST:

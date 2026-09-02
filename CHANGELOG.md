@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-09-02
+
+### Added
+
+- Presentation helpers: `presentation("Контрагент")` → `Контрагент____Presentation`, `ALL_PRESENTATIONS` (`*____Presentation`). `query(select=["Ref_Key", "Description"])` joins with a comma. `query(presentations=True)` appends `*____Presentation` (`$select=*, *____Presentation` when values are also selected).
+- Tabular-section filters: `F("Товары").any(F("Цена") > 10000)` / `.all(...)` emit OData 3.0 `Товары/any(d: d/Цена gt 10000)`. Module-level `any_()` / `all_()` (do not shadow builtins).
+- Write helpers: `odata_bind("Catalog_Организации", guid)`, `bind_field("Организация", ...)`, `base64_data("Файл")` → `Файл_Base64Data`.
+- `Infobase(..., data_load_mode=False)` and per-call `data_load_mode=True` on `create` / `edit` / `replace` / `delete` (and `Document.create` / `edit`) send `1C_OData-DataLoadMode: true` on POST/PATCH/PUT/DELETE only.
+- Richer `$metadata` parse (stdlib XML, no codegen): EntityType keys, properties, navigation names. `Infobase.entity_type_for_set("Catalog_Товары")` resolves EntitySet → EntityType; parsed model is cached after the first metadata fetch.
+- `Enumeration` (read-only, like `DocumentJournal`). `CalculationRegister.recalculation()` / `.base()` → functions `Recalculation` / `Base` (`Condition`, `MainRegisterDimensions`, `BaseRegisterDimensions`, `ViewPoints`).
+- `EntitySet.url()` builds the collection/query URL without sending a request.
+- `ODataError.internal_code` from `odata.error.code` / `error.code` when present. HTTP 404/403/412 still map to `EntityNotFound` / `AccessDenied` / `ConcurrencyError`.
+
 ## [0.4.0] - 2026-09-02
 
 ### Added
@@ -42,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial PyPI release of the async 1C OData client.
 
+[0.5.0]: https://github.com/itsuppartem/python_1c_odata/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/itsuppartem/python_1c_odata/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/itsuppartem/python_1c_odata/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/itsuppartem/python_1c_odata/compare/v0.1.2...v0.2.1

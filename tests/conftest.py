@@ -35,6 +35,7 @@ class FakeOData:
                 "authorization": request.headers.get("Authorization", ""),
                 "content_type": request.headers.get("Content-Type", ""),
                 "if_match": request.headers.get("If-Match", ""),
+                "data_load_mode": request.headers.get("1C_OData-DataLoadMode", ""),
             }
         )
         if self._queue:

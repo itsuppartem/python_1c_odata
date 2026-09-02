@@ -95,6 +95,14 @@ class Filter:
     def cast(self, type_name: str) -> Filter:
         return cast(self, type_name)
 
+    def any(self, predicate: str | Filter) -> Filter:
+        """OData 3.0: ``Товары/any(d: d/Цена gt 10000)``."""
+        return Filter(f"{self.text}/any(d: {_lambda_body(predicate)})")
+
+    def all(self, predicate: str | Filter) -> Filter:
+        """OData 3.0: ``Товары/all(d: d/Цена gt 10000)``."""
+        return Filter(f"{self.text}/all(d: {_lambda_body(predicate)})")
+
 
 class F(Filter):
     """Field reference: ``F("Цена") > 1000``, ``F("Ref_Key") == guid("...")``."""
@@ -131,10 +139,101 @@ def cast(field: str | Filter, type_name: str) -> Filter:
     return Filter(f"cast({_field(field)}, {_type_name(type_name)})")
 
 
+def any_(collection: str | Filter, predicate: str | Filter) -> Filter:
+    """Module-level ``any`` (named ``any_`` so the builtin is not shadowed)."""
+    return F(_field(collection)).any(predicate)
+
+
+def all_(collection: str | Filter, predicate: str | Filter) -> Filter:
+    """Module-level ``all`` (named ``all_`` so the builtin is not shadowed)."""
+    return F(_field(collection)).all(predicate)
+
+
 def as_filter_text(odata_filter: str | Filter | None) -> str | None:
     if odata_filter is None:
         return None
     return str(odata_filter)
+
+
+_LAMBDA_VAR = "d"
+_RESERVED = frozenset(
+    {
+        "eq",
+        "ne",
+        "gt",
+        "ge",
+        "lt",
+        "le",
+        "and",
+        "or",
+        "not",
+        "true",
+        "false",
+        "null",
+        "startswith",
+        "endswith",
+        "substringof",
+        "contains",
+        "isof",
+        "cast",
+        "any",
+        "all",
+        "guid",
+        "datetime",
+        "edm",
+    }
+)
+
+
+def _lambda_body(predicate: str | Filter) -> str:
+    return _prefix_lambda_fields(str(predicate), _LAMBDA_VAR)
+
+
+def _prefix_lambda_fields(text: str, var: str) -> str:
+    """Prefix bare field names with ``d/``; leave operators, literals, and paths alone."""
+    out: list[str] = []
+    i = 0
+    n = len(text)
+    last_significant = ""
+    while i < n:
+        ch = text[i]
+        if ch == "'":
+            j = i + 1
+            while j < n:
+                if text[j] == "'":
+                    if j + 1 < n and text[j + 1] == "'":
+                        j += 2
+                        continue
+                    j += 1
+                    break
+                j += 1
+            token = text[i:j]
+            out.append(token)
+            last_significant = token
+            i = j
+            continue
+        if ch.isalpha() or ch == "_":
+            j = i + 1
+            while j < n and (text[j].isalnum() or text[j] == "_"):
+                j += 1
+            ident = text[i:j]
+            if (
+                ident.lower() in _RESERVED
+                or ident == var
+                or last_significant.endswith("/")
+                or last_significant == "."
+            ):
+                out.append(ident)
+            else:
+                out.append(f"{var}/{ident}")
+            last_significant = ident
+            i = j
+            continue
+        out.append(ch)
+        if not ch.isspace():
+            last_significant = ch
+        i += 1
+    return "".join(out)
 
 
 def _field(value: str | Filter) -> str:

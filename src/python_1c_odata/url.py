@@ -18,12 +18,16 @@ def entity_path(root: str, entity: str) -> str:
     return f"{root.rstrip('/')}/{entity}"
 
 
-def key_path(root: str, entity: str, key: str | Mapping[str, str]) -> str:
-    base = entity_path(root, entity)
+def entity_key(entity: str, key: str | Mapping[str, str]) -> str:
+    """``Catalog_X(guid'...')`` or ``Register_X(Name=guid'...',Period=datetime'...')``."""
     if isinstance(key, Mapping):
         inner = ",".join(f"{name}={_key_literal(value)}" for name, value in key.items())
-        return f"{base}({inner})"
-    return f"{base}({guid(key)})"
+        return f"{entity}({inner})"
+    return f"{entity}({guid(key)})"
+
+
+def key_path(root: str, entity: str, key: str | Mapping[str, str]) -> str:
+    return f"{root.rstrip('/')}/{entity_key(entity, key)}"
 
 
 def query_string(
@@ -113,9 +117,18 @@ def calculation_virtual_path(
     function: str,
     *,
     condition: str | None = None,
+    main_register_dimensions: str | None = None,
+    base_register_dimensions: str | None = None,
+    view_points: str | None = None,
 ) -> str:
-    """Calculation register virtual table. 1C OData: ScheduledData, ActualActionPeriod."""
-    return accumulation_virtual_path(root, entity, function, condition=condition)
+    """Calculation register virtual table: ScheduledData, ActualActionPeriod, Recalculation, Base."""
+    args = _named_args(
+        Condition=_quoted_condition(condition),
+        MainRegisterDimensions=_quoted_condition(main_register_dimensions),
+        BaseRegisterDimensions=_quoted_condition(base_register_dimensions),
+        ViewPoints=_quoted_condition(view_points),
+    )
+    return f"{entity_path(root, entity)}/{function}({args})"
 
 
 def _quoted_condition(condition: str | None) -> str | None:
